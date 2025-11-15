@@ -97,6 +97,8 @@ npm run dev
 
 The backend will run on `http://localhost:5000`
 
+**Note:** The `npm run dev` command includes an automatic port cleanup that kills any process using port 5000 before starting the server. This prevents `EADDRINUSE` errors.
+
 ### Frontend Setup
 
 1. Navigate to the frontend directory:
@@ -166,6 +168,62 @@ Visit `http://localhost:3000/register` and create accounts with different roles:
 3. Click "Join Session"
 4. View images as examiner advances them
 5. See synchronized timer and clinical history
+
+## Troubleshooting
+
+### Port 5000 Already in Use
+
+If you encounter the error `EADDRINUSE: address already in use :::5000`, it means another process is using port 5000.
+
+**Automatic Fix (Recommended):**
+The backend includes an automatic port cleanup script. Simply run:
+```bash
+npm run dev
+```
+
+**Manual Fix:**
+If you need to manually kill the process on port 5000:
+
+On macOS/Linux:
+```bash
+lsof -ti:5000 | xargs kill -9
+```
+
+Or use the npm script:
+```bash
+npm run kill-port
+```
+
+### MongoDB Deprecation Warnings
+
+The application has been updated to work with MongoDB Driver v4.0.0+. The deprecated options `useNewUrlParser` and `useUnifiedTopology` have been removed from the connection configuration.
+
+If you see these warnings, make sure you have the latest version of the code:
+```bash
+git pull origin main
+cd backend
+npm install
+```
+
+### Cannot Find Module Errors
+
+If you see errors like `Cannot find module 'express'`:
+1. Make sure you're in the correct directory (`backend` or `frontend`)
+2. Install dependencies:
+```bash
+npm install
+```
+
+### MongoDB Connection Errors
+
+Make sure MongoDB is running:
+```bash
+# On macOS with Homebrew
+brew services start mongodb-community
+
+# On Linux
+sudo systemctl start mongod
+```
 
 ## Project Structure
 
