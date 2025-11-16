@@ -31,6 +31,7 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/cases', require('./routes/cases'));
 app.use('/api/exams', require('./routes/exams'));
 app.use('/api/sessions', require('./routes/sessions'));
+app.use('/api/admin', require('./routes/admin'));
 
 // Socket.IO for real-time exam sessions
 require('./socket/examSession')(io);

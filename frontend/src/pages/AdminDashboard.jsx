@@ -3,6 +3,8 @@ import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
 import CaseManager from '../components/admin/CaseManager'
 import ExamManager from '../components/admin/ExamManager'
+import ExaminerManager from '../components/admin/ExaminerManager'
+import SessionManager from '../components/admin/SessionManager'
 
 export default function AdminDashboard() {
   const { user, logout } = useAuth()
@@ -55,12 +57,34 @@ export default function AdminDashboard() {
               >
                 Manage Exams
               </button>
+              <button
+                onClick={() => setActiveTab('examiners')}
+                className={`${
+                  activeTab === 'examiners'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                Manage Examiners
+              </button>
+              <button
+                onClick={() => setActiveTab('sessions')}
+                className={`${
+                  activeTab === 'sessions'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                Manage Sessions
+              </button>
             </nav>
           </div>
         </div>
 
         {activeTab === 'cases' && <CaseManager />}
         {activeTab === 'exams' && <ExamManager />}
+        {activeTab === 'examiners' && <ExaminerManager />}
+        {activeTab === 'sessions' && <SessionManager />}
       </div>
     </div>
   )
