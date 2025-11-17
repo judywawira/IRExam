@@ -31,9 +31,28 @@ app.use('/api/auth', require('./routes/auth'));
 app.use('/api/cases', require('./routes/cases'));
 app.use('/api/exams', require('./routes/exams'));
 app.use('/api/sessions', require('./routes/sessions'));
+app.use('/api/admin', require('./routes/admin'));
 
 // Socket.IO for real-time exam sessions
 require('./socket/examSession')(io);
+
+// Root route
+app.get('/', (req, res) => {
+  res.json({
+    name: 'IR Exam API',
+    version: '1.0.0',
+    description: 'Image-Based Case Examination System API',
+    endpoints: {
+      health: '/health',
+      authentication: '/api/auth',
+      cases: '/api/cases',
+      exams: '/api/exams',
+      sessions: '/api/sessions'
+    },
+    frontend: process.env.FRONTEND_URL || 'http://localhost:3000',
+    documentation: 'See README.md for full API documentation'
+  });
+});
 
 // Health check
 app.get('/health', (req, res) => {
