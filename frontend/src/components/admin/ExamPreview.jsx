@@ -29,24 +29,17 @@ export default function ExamPreview({ examId, onClose }) {
   const totalImages = currentCase?.images.length || 0
   const totalCases = exam?.cases.length || 0
 
-  const nextImage = () => {
-    if (currentImageIndex < totalImages - 1) {
-      setCurrentImageIndex(currentImageIndex + 1)
-    } else if (currentCaseIndex < totalCases - 1) {
-      // Move to next case
+  const nextCase = () => {
+    if (currentCaseIndex < totalCases - 1) {
       setCurrentCaseIndex(currentCaseIndex + 1)
       setCurrentImageIndex(0)
     }
   }
 
-  const prevImage = () => {
-    if (currentImageIndex > 0) {
-      setCurrentImageIndex(currentImageIndex - 1)
-    } else if (currentCaseIndex > 0) {
-      // Move to previous case
+  const prevCase = () => {
+    if (currentCaseIndex > 0) {
       setCurrentCaseIndex(currentCaseIndex - 1)
-      const prevCase = exam.cases[currentCaseIndex - 1]
-      setCurrentImageIndex(prevCase.images.length - 1)
+      setCurrentImageIndex(0)
     }
   }
 
@@ -55,8 +48,8 @@ export default function ExamPreview({ examId, onClose }) {
     setCurrentImageIndex(0)
   }
 
-  const isFirstImage = currentCaseIndex === 0 && currentImageIndex === 0
-  const isLastImage = currentCaseIndex === totalCases - 1 && currentImageIndex === totalImages - 1
+  const isFirstCase = currentCaseIndex === 0
+  const isLastCase = currentCaseIndex === totalCases - 1
 
   if (loading) {
     return (
@@ -173,20 +166,31 @@ export default function ExamPreview({ examId, onClose }) {
             </div>
 
             {/* Image Display */}
-            <div className="flex-1 flex items-center justify-center bg-gray-900 p-6">
-              {currentImage ? (
-                <div className="max-w-full max-h-full flex flex-col items-center">
-                  <img
-                    src={`/${currentImage.path}`}
-                    alt={currentImage.originalName}
-                    className="max-w-full max-h-[60vh] object-contain rounded"
-                  />
-                  <p className="text-white text-sm mt-4">
-                    Image {currentImageIndex + 1} of {totalImages}: {currentImage.originalName}
-                  </p>
+            <div className="flex-1 bg-gray-900 p-6 overflow-auto">
+              {currentCase?.images && currentCase.images.length > 0 ? (
+                <div className="flex flex-col gap-6 items-center min-h-full justify-center">
+                  {currentCase.images.map((image, idx) => (
+                    <div key={idx} className="max-w-full flex flex-col items-center">
+                      <img
+                        src={`/${image.path}`}
+                        alt={image.originalName}
+                        className="max-w-full max-h-[70vh] object-contain rounded shadow-lg"
+                      />
+                      <p className="text-white text-sm mt-3 bg-gray-800 px-4 py-2 rounded">
+                        Image {idx + 1} of {currentCase.images.length}: {image.originalName}
+                      </p>
+                      {image.description && (
+                        <p className="text-gray-300 text-xs mt-1 italic">
+                          {image.description}
+                        </p>
+                      )}
+                    </div>
+                  ))}
                 </div>
               ) : (
-                <p className="text-white">No images available</p>
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-white">No images available</p>
+                </div>
               )}
             </div>
 
@@ -194,36 +198,36 @@ export default function ExamPreview({ examId, onClose }) {
             <div className="bg-gray-100 border-t px-6 py-4">
               <div className="flex justify-between items-center">
                 <button
-                  onClick={prevImage}
-                  disabled={isFirstImage}
+                  onClick={prevCase}
+                  disabled={isFirstCase}
                   className={`px-4 py-2 rounded font-medium ${
-                    isFirstImage
+                    isFirstCase
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       : 'bg-indigo-600 text-white hover:bg-indigo-700'
                   }`}
                 >
-                  ← Previous
+                  ← Previous Case
                 </button>
 
                 <div className="text-center">
                   <p className="text-sm font-medium text-gray-700">
-                    Case {currentCaseIndex + 1} of {totalCases} | Image {currentImageIndex + 1} of {totalImages}
+                    Case {currentCaseIndex + 1} of {totalCases}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    Total: {exam.cases.reduce((sum, c) => sum + c.images.length, 0)} images in exam
+                    {totalImages} images in this case | Scroll to view all
                   </p>
                 </div>
 
                 <button
-                  onClick={nextImage}
-                  disabled={isLastImage}
+                  onClick={nextCase}
+                  disabled={isLastCase}
                   className={`px-4 py-2 rounded font-medium ${
-                    isLastImage
+                    isLastCase
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                       : 'bg-indigo-600 text-white hover:bg-indigo-700'
                   }`}
                 >
-                  Next →
+                  Next Case →
                 </button>
               </div>
             </div>

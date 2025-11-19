@@ -30,6 +30,18 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  institution: {
+    type: String,
+    default: ''
+  },
+  isArchived: {
+    type: Boolean,
+    default: false
+  },
+  archivedDate: {
+    type: Date,
+    default: null
+  },
   createdAt: {
     type: Date,
     default: Date.now

@@ -4,13 +4,15 @@ import axios from 'axios'
 export default function StudentManager() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('pending') // 'pending', 'approved', 'all'
+  const [filter, setFilter] = useState('pending') // 'pending', 'approved', 'all', 'archived'
   const [roleFilter, setRoleFilter] = useState('all') // 'all', 'student', 'examiner'
+  const [institutionFilter, setInstitutionFilter] = useState('all') // 'all' or specific institution
   const [stats, setStats] = useState({
     totalStudents: 0,
     pendingStudents: 0,
     totalExaminers: 0,
-    pendingExaminers: 0
+    pendingExaminers: 0,
+    archivedStudents: 0
   })
 
   useEffect(() => {
@@ -30,9 +32,10 @@ export default function StudentManager() {
 
       setStats({
         totalStudents: studentUsers.length,
-        pendingStudents: studentUsers.filter(u => !u.isApproved).length,
+        pendingStudents: studentUsers.filter(u => !u.isApproved && !u.isArchived).length,
         totalExaminers: examinerUsers.length,
-        pendingExaminers: examinerUsers.filter(u => !u.isApproved).length
+        pendingExaminers: examinerUsers.filter(u => !u.isApproved && !u.isArchived).length,
+        archivedStudents: studentUsers.filter(u => u.isArchived).length
       })
 
       setUsers(allUsers)
@@ -89,6 +92,39 @@ export default function StudentManager() {
     }
   }
 
+  const handleArchive = async (userId) => {
+    if (!window.confirm('Archive this student? They will still be searchable for performance history.')) {
+      return
+    }
+
+    try {
+      await axios.patch(`/api/admin/users/${userId}/archive`)
+      alert('Student archived successfully')
+      fetchUsers()
+    } catch (error) {
+      console.error('Error archiving user:', error)
+      alert('Failed to archive student')
+    }
+  }
+
+  const handleUnarchive = async (userId) => {
+    if (!window.confirm('Unarchive this student?')) {
+      return
+    }
+
+    try {
+      await axios.patch(`/api/admin/users/${userId}/unarchive`)
+      alert('Student unarchived successfully')
+      fetchUsers()
+    } catch (error) {
+      console.error('Error unarchiving user:', error)
+      alert('Failed to unarchive student')
+    }
+  }
+
+  // Get unique institutions for filter
+  const institutions = [...new Set(users.map(u => u.institution).filter(Boolean))]
+
   // Filter users based on current filters
   const filteredUsers = users.filter(user => {
     // Filter by role
@@ -96,7 +132,21 @@ export default function StudentManager() {
       return false
     }
 
-    // Filter by approval status
+    // Filter by institution
+    if (institutionFilter !== 'all' && user.institution !== institutionFilter) {
+      return false
+    }
+
+    // Filter by archive/approval status
+    if (filter === 'archived') {
+      return user.isArchived
+    }
+
+    // For non-archived views, exclude archived users
+    if (user.isArchived && filter !== 'archived') {
+      return false
+    }
+
     if (filter === 'pending' && user.isApproved) {
       return false
     }
@@ -122,7 +172,7 @@ export default function StudentManager() {
         <h2 className="text-2xl font-bold mb-4">Manage Users</h2>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-sm text-gray-600">Pending Students</div>
             <div className="text-3xl font-bold text-yellow-600">{stats.pendingStudents}</div>
@@ -130,6 +180,10 @@ export default function StudentManager() {
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-sm text-gray-600">Total Students</div>
             <div className="text-3xl font-bold text-blue-600">{stats.totalStudents}</div>
+          </div>
+          <div className="bg-white p-4 rounded-lg shadow">
+            <div className="text-sm text-gray-600">Archived Students</div>
+            <div className="text-3xl font-bold text-gray-600">{stats.archivedStudents}</div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow">
             <div className="text-sm text-gray-600">Pending Examiners</div>
@@ -166,6 +220,16 @@ export default function StudentManager() {
                 Approved
               </button>
               <button
+                onClick={() => setFilter('archived')}
+                className={`${
+                  filter === 'archived'
+                    ? 'border-gray-500 text-gray-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}
+              >
+                Archived ({stats.archivedStudents})
+              </button>
+              <button
                 onClick={() => setFilter('all')}
                 className={`${
                   filter === 'all'
@@ -173,24 +237,41 @@ export default function StudentManager() {
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 } whitespace-nowrap py-2 px-1 border-b-2 font-medium text-sm`}
               >
-                All Users
+                All Active
               </button>
             </nav>
           </div>
         </div>
 
-        {/* Role Filter */}
-        <div className="mb-4">
-          <label className="text-sm font-medium text-gray-700 mr-2">Filter by Role:</label>
-          <select
-            value={roleFilter}
-            onChange={(e) => setRoleFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-          >
-            <option value="all">All Roles</option>
-            <option value="student">Students Only</option>
-            <option value="examiner">Examiners Only</option>
-          </select>
+        {/* Filters */}
+        <div className="mb-4 flex gap-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700 mr-2">Filter by Role:</label>
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+            >
+              <option value="all">All Roles</option>
+              <option value="student">Students Only</option>
+              <option value="examiner">Examiners Only</option>
+            </select>
+          </div>
+          {institutions.length > 0 && (
+            <div>
+              <label className="text-sm font-medium text-gray-700 mr-2">Filter by Institution:</label>
+              <select
+                value={institutionFilter}
+                onChange={(e) => setInstitutionFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+              >
+                <option value="all">All Institutions</option>
+                {institutions.map(inst => (
+                  <option key={inst} value={inst}>{inst}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -204,6 +285,9 @@ export default function StudentManager() {
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Email
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Institution
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Role
@@ -222,7 +306,7 @@ export default function StudentManager() {
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredUsers.length === 0 ? (
               <tr>
-                <td colSpan="6" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan="7" className="px-6 py-4 text-center text-gray-500">
                   No users found
                 </td>
               </tr>
@@ -251,6 +335,9 @@ export default function StudentManager() {
                     <div className="text-sm text-gray-900">{user.email}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{user.institution || '-'}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                       user.role === 'student'
                         ? 'bg-blue-100 text-blue-800'
@@ -265,37 +352,71 @@ export default function StudentManager() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      user.isApproved
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {user.isApproved ? 'Approved' : 'Pending'}
-                    </span>
+                    {user.isArchived ? (
+                      <div>
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                          Archived
+                        </span>
+                        {user.archivedDate && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {new Date(user.archivedDate).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        user.isApproved
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-yellow-100 text-yellow-800'
+                      }`}>
+                        {user.isApproved ? 'Approved' : 'Pending'}
+                      </span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex space-x-2">
-                      {!user.isApproved ? (
+                    <div className="flex flex-col gap-1">
+                      <div className="flex space-x-2">
+                        {user.isArchived ? (
+                          <button
+                            onClick={() => handleUnarchive(user._id)}
+                            className="text-blue-600 hover:text-blue-900"
+                          >
+                            Unarchive
+                          </button>
+                        ) : (
+                          <>
+                            {!user.isApproved ? (
+                              <button
+                                onClick={() => handleApprove(user._id)}
+                                className="text-green-600 hover:text-green-900"
+                              >
+                                Approve
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleRevoke(user._id)}
+                                className="text-orange-600 hover:text-orange-900"
+                              >
+                                Revoke
+                              </button>
+                            )}
+                          </>
+                        )}
                         <button
-                          onClick={() => handleApprove(user._id)}
-                          className="text-green-600 hover:text-green-900"
+                          onClick={() => handleDelete(user._id)}
+                          className="text-red-600 hover:text-red-900"
                         >
-                          Approve
+                          Delete
                         </button>
-                      ) : (
+                      </div>
+                      {user.role === 'student' && !user.isArchived && (
                         <button
-                          onClick={() => handleRevoke(user._id)}
-                          className="text-orange-600 hover:text-orange-900"
+                          onClick={() => handleArchive(user._id)}
+                          className="text-gray-600 hover:text-gray-900 text-left"
                         >
-                          Revoke
+                          Archive
                         </button>
                       )}
-                      <button
-                        onClick={() => handleDelete(user._id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        Delete
-                      </button>
                     </div>
                   </td>
                 </tr>

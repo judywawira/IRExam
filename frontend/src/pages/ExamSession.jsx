@@ -18,6 +18,7 @@ export default function ExamSession() {
   const [timeRemaining, setTimeRemaining] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [viewMode, setViewMode] = useState('history') // 'history' or 'image'
 
   const isExaminer = user.role === 'examiner' || user.role === 'admin'
 
@@ -100,7 +101,19 @@ export default function ExamSession() {
 
     socketRef.current.on('exam-ended', () => {
       setIsRunning(false)
-      alert('Exam has ended')
+      alert('Exam has ended. Returning to dashboard...')
+      // Navigate to appropriate dashboard after a short delay
+      setTimeout(() => {
+        if (user.role === 'student') {
+          navigate('/student-dashboard')
+        } else if (user.role === 'examiner') {
+          navigate('/examiner-dashboard')
+        } else if (user.role === 'admin') {
+          navigate('/admin-dashboard')
+        } else {
+          navigate('/')
+        }
+      }, 1500)
     })
 
     socketRef.current.on('image-changed', ({ caseIndex, imageIndex }) => {
@@ -155,6 +168,7 @@ export default function ExamSession() {
     // Update local state immediately for responsive UI
     setCurrentCaseIndex(caseIndex)
     setCurrentImageIndex(imageIndex)
+    setViewMode('image')
     updateCurrentDisplay(session.exam, caseIndex, imageIndex)
 
     // Emit socket event to sync with other participants
@@ -163,6 +177,21 @@ export default function ExamSession() {
       caseIndex,
       imageIndex
     })
+  }
+
+  const showHistory = (caseIndex) => {
+    console.log('Showing history for case:', caseIndex)
+    if (!session?.exam?.cases) return
+    const caseData = session.exam.cases[caseIndex]
+    if (!caseData) return
+
+    // Update to show history view
+    if (caseIndex !== currentCaseIndex) {
+      setCurrentCaseIndex(caseIndex)
+      setCurrentImageIndex(0)
+      updateCurrentDisplay(session.exam, caseIndex, 0)
+    }
+    setViewMode('history')
   }
 
   const nextImage = () => {
@@ -230,63 +259,126 @@ export default function ExamSession() {
       <div className="flex h-[calc(100vh-80px)]">
         {/* Main Display Area */}
         <div className="flex-1 flex flex-col p-6 overflow-y-auto">
-          {/* Clinical History - Displayed First */}
-          {currentCase && (
-            <div className="bg-gray-800 rounded-lg p-6 mb-6">
-              <h3 className="text-lg font-semibold mb-3 text-blue-400">
-                Case {currentCaseIndex + 1}: {currentCase.title}
-              </h3>
-              <div className="bg-gray-900 p-4 rounded">
-                <h4 className="text-sm font-semibold text-gray-400 mb-2">Clinical History</h4>
-                <p className="text-gray-300 leading-relaxed">{currentCase.clinicalHistory}</p>
+          {/* Clinical History View - Full Screen Slide */}
+          {viewMode === 'history' && currentCase && (
+            <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-blue-900 to-gray-900 rounded-lg p-12">
+              <div className="max-w-4xl w-full">
+                <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
+                  <div className="mb-6">
+                    <h2 className="text-3xl font-bold text-blue-300 mb-2">
+                      Case {currentCaseIndex + 1}
+                    </h2>
+                    <h3 className="text-2xl font-semibold text-white">
+                      {currentCase.title}
+                    </h3>
+                  </div>
+                  <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+                    <h4 className="text-lg font-semibold text-blue-400 mb-4">Clinical History</h4>
+                    <p className="text-gray-200 text-lg leading-relaxed whitespace-pre-wrap">
+                      {currentCase.clinicalHistory}
+                    </p>
+                  </div>
+                  {isExaminer && (
+                    <div className="mt-6 text-center">
+                      <p className="text-gray-400 text-sm">
+                        Click on image thumbnails below to view images →
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
-          {/* Image Display */}
-          <div className="flex-shrink-0 flex flex-col items-center justify-center bg-black rounded-lg p-6 mb-6">
-            {currentImage ? (
-              <div className="w-full">
-                <img
-                  src={`/${currentImage.path}`}
-                  alt={currentImage.originalName}
-                  className="w-full h-auto max-h-[50vh] object-contain rounded-lg shadow-lg mx-auto"
-                />
-                <div className="text-center mt-4">
-                  <p className="text-gray-400">
-                    Case {currentCaseIndex + 1} / {session.exam.cases.length} -
-                    Image {currentImageIndex + 1} / {currentCase?.images.length}
-                  </p>
-                  {currentImage.description && (
-                    <p className="mt-2 text-gray-500 text-sm italic">
-                      {currentImage.description}
-                    </p>
-                  )}
+          {/* Image Display View */}
+          {viewMode === 'image' && (
+            <div className="flex-1 flex flex-col">
+              {/* Case Title */}
+              {currentCase && (
+                <div className="bg-gray-800 rounded-lg p-4 mb-4">
+                  <h3 className="text-lg font-semibold text-blue-400">
+                    Case {currentCaseIndex + 1}: {currentCase.title}
+                  </h3>
                 </div>
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <p className="text-gray-400 text-lg mb-2">No image to display</p>
-                {session.status === 'scheduled' && (
-                  <p className="text-gray-500">Waiting for examiner to start the exam...</p>
+              )}
+
+              {/* Image Display */}
+              <div className="flex-1 flex flex-col items-center justify-center bg-black rounded-lg p-6">
+                {currentImage ? (
+                  <div className="w-full">
+                    <img
+                      src={`/${currentImage.path}`}
+                      alt={currentImage.originalName}
+                      className="w-full h-auto max-h-[60vh] object-contain rounded-lg shadow-lg mx-auto"
+                    />
+                    <div className="text-center mt-4">
+                      <p className="text-gray-400">
+                        Case {currentCaseIndex + 1} / {session.exam.cases.length} -
+                        Image {currentImageIndex + 1} / {currentCase?.images.length}
+                      </p>
+                      {currentImage.description && (
+                        <p className="mt-2 text-gray-500 text-sm italic">
+                          {currentImage.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <p className="text-gray-400 text-lg mb-2">No image to display</p>
+                    {session.status === 'scheduled' && (
+                      <p className="text-gray-500">Waiting for examiner to start the exam...</p>
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Image Tiles for Examiners */}
-          {isExaminer && currentCase && currentCase.images.length > 0 && (
-            <div className="bg-gray-800 rounded-lg p-6">
+          {/* Thumbnails for Examiners - History + Images */}
+          {isExaminer && currentCase && (
+            <div className="bg-gray-800 rounded-lg p-6 mt-4">
               <h4 className="text-sm font-semibold mb-4 text-gray-300">
-                All Images in Case {currentCaseIndex + 1} ({currentCase.images.length} images)
+                Case {currentCaseIndex + 1} - Click to navigate
               </h4>
               <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+                {/* Clinical History Thumbnail */}
+                <button
+                  onClick={() => showHistory(currentCaseIndex)}
+                  className={`relative aspect-square rounded-lg overflow-hidden transition-all transform hover:scale-105 ${
+                    viewMode === 'history'
+                      ? 'ring-4 ring-blue-500 shadow-lg shadow-blue-500/50'
+                      : 'ring-1 ring-gray-600 hover:ring-2 hover:ring-gray-400'
+                  }`}
+                  title="Clinical History"
+                >
+                  <div className="w-full h-full bg-gradient-to-br from-blue-600 to-blue-800 flex items-center justify-center p-2">
+                    <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                  </div>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                  <span className="absolute bottom-1 left-1 right-1 bg-black/90 text-white text-xs px-1 py-1 rounded font-semibold text-center">
+                    History
+                  </span>
+                  {viewMode === 'history' && (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                        <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    </div>
+                  )}
+                </button>
+
+                {/* Image Thumbnails */}
                 {currentCase.images.map((img, idx) => (
                   <button
                     key={idx}
                     onClick={() => navigateToImage(currentCaseIndex, idx)}
                     className={`relative aspect-square rounded-lg overflow-hidden transition-all transform hover:scale-105 ${
-                      currentImageIndex === idx
+                      viewMode === 'image' && currentImageIndex === idx
                         ? 'ring-4 ring-blue-500 shadow-lg shadow-blue-500/50'
                         : 'ring-1 ring-gray-600 hover:ring-2 hover:ring-gray-400'
                     }`}
@@ -301,7 +393,7 @@ export default function ExamSession() {
                     <span className="absolute bottom-1 right-1 bg-black/90 text-white text-xs px-2 py-1 rounded font-semibold">
                       {idx + 1}
                     </span>
-                    {currentImageIndex === idx && (
+                    {viewMode === 'image' && currentImageIndex === idx && (
                       <div className="absolute inset-0 flex items-center justify-center">
                         <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
                           <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -383,7 +475,7 @@ export default function ExamSession() {
                     {session.exam.cases.map((caseItem, idx) => (
                       <button
                         key={idx}
-                        onClick={() => navigateToImage(idx, 0)}
+                        onClick={() => showHistory(idx)}
                         className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
                           currentCaseIndex === idx
                             ? 'bg-blue-600 text-white shadow-lg'
