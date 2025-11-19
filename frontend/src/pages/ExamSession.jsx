@@ -249,7 +249,7 @@ export default function ExamSession() {
                   Case {session.currentCaseIndex + 1} / {session.exam.cases.length} -
                   Image {session.currentImageIndex + 1} / {currentCase?.images.length}
                 </p>
-                {currentImage.description && (
+                {isExaminer && currentImage.description && (
                   <p className="text-center mt-2 text-gray-500 text-sm italic">
                     {currentImage.description}
                   </p>
