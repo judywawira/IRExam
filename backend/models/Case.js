@@ -37,6 +37,16 @@ const caseSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  usageHistory: [{
+    examSession: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'ExamSession'
+    },
+    usedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
   createdAt: {
     type: Date,
     default: Date.now

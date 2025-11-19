@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const ExamSession = require('../models/ExamSession');
+const Case = require('../models/Case');
 
 module.exports = (io) => {
   // Middleware to authenticate socket connections
@@ -64,7 +65,7 @@ module.exports = (io) => {
       }
 
       try {
-        const session = await ExamSession.findById(sessionId);
+        const session = await ExamSession.findById(sessionId).populate('exam');
 
         if (!session) {
           socket.emit('error', { message: 'Session not found' });
@@ -73,7 +74,25 @@ module.exports = (io) => {
 
         session.status = 'active';
         session.startTime = new Date();
+        session.lastUpdated = new Date();
         await session.save();
+
+        // Track case usage for analytics
+        if (session.exam && session.exam.cases) {
+          for (const caseId of session.exam.cases) {
+            await Case.findByIdAndUpdate(
+              caseId,
+              {
+                $push: {
+                  usageHistory: {
+                    examSession: sessionId,
+                    usedAt: new Date()
+                  }
+                }
+              }
+            );
+          }
+        }
 
         // Notify all participants
         io.to(sessionId).emit('exam-started', {
@@ -105,6 +124,7 @@ module.exports = (io) => {
 
         session.currentCaseIndex = caseIndex;
         session.currentImageIndex = imageIndex;
+        session.lastUpdated = new Date();
         await session.save();
 
         // Broadcast to all participants

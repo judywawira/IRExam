@@ -35,12 +35,22 @@ router.post('/register',
         password,
         firstName,
         lastName,
-        role
+        role,
+        // Admins are auto-approved, students and examiners need approval
+        isApproved: role === 'admin'
       });
 
       await user.save();
 
-      // Generate JWT token
+      // For non-admin users, don't generate token yet - they need approval
+      if (role !== 'admin') {
+        return res.status(201).json({
+          message: 'Registration successful. Please wait for admin approval before logging in.',
+          requiresApproval: true
+        });
+      }
+
+      // Generate JWT token for admins
       const token = jwt.sign(
         { userId: user._id, role: user.role },
         process.env.JWT_SECRET,
@@ -55,7 +65,8 @@ router.post('/register',
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          role: user.role
+          role: user.role,
+          isApproved: user.isApproved
         }
       });
     } catch (error) {
@@ -92,6 +103,14 @@ router.post('/login',
         return res.status(401).json({ message: 'Invalid credentials' });
       }
 
+      // Check if user is approved
+      if (!user.isApproved) {
+        return res.status(403).json({
+          message: 'Your account is pending approval. Please contact an administrator.',
+          requiresApproval: true
+        });
+      }
+
       // Generate JWT token
       const token = jwt.sign(
         { userId: user._id, role: user.role },
@@ -107,7 +126,8 @@ router.post('/login',
           email: user.email,
           firstName: user.firstName,
           lastName: user.lastName,
-          role: user.role
+          role: user.role,
+          isApproved: user.isApproved
         }
       });
     } catch (error) {
@@ -126,7 +146,8 @@ router.get('/me', authenticate, async (req, res) => {
         email: req.user.email,
         firstName: req.user.firstName,
         lastName: req.user.lastName,
-        role: req.user.role
+        role: req.user.role,
+        isApproved: req.user.isApproved
       }
     });
   } catch (error) {

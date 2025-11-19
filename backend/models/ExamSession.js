@@ -33,6 +33,10 @@ const examSessionSchema = new mongoose.Schema({
   timeRemaining: {
     type: Number // Seconds remaining
   },
+  assignedStudents: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
   participants: [{
     student: {
       type: mongoose.Schema.Types.ObjectId,
@@ -44,6 +48,10 @@ const examSessionSchema = new mongoose.Schema({
       default: true
     }
   }],
+  lastUpdated: {
+    type: Date,
+    default: Date.now
+  },
   createdAt: {
     type: Date,
     default: Date.now

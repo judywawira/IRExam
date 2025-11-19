@@ -6,44 +6,21 @@ import { useAuth } from '../context/AuthContext'
 export default function ExaminerDashboard() {
   const { user, logout } = useAuth()
   const [sessions, setSessions] = useState([])
-  const [exams, setExams] = useState([])
-  const [selectedExam, setSelectedExam] = useState('')
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {
-    fetchData()
+    fetchSessions()
   }, [])
 
-  const fetchData = async () => {
+  const fetchSessions = async () => {
     try {
-      const [sessionsRes, examsRes] = await Promise.all([
-        axios.get('/api/sessions'),
-        axios.get('/api/exams')
-      ])
-      setSessions(sessionsRes.data.sessions)
-      setExams(examsRes.data.exams)
+      const response = await axios.get('/api/sessions')
+      setSessions(response.data.sessions)
     } catch (error) {
-      console.error('Error fetching data:', error)
+      console.error('Error fetching sessions:', error)
     } finally {
       setLoading(false)
-    }
-  }
-
-  const createSession = async () => {
-    if (!selectedExam) {
-      alert('Please select an exam')
-      return
-    }
-
-    try {
-      const response = await axios.post('/api/sessions', { examId: selectedExam })
-      setSessions([response.data.session, ...sessions])
-      setSelectedExam('')
-      alert('Session created successfully')
-    } catch (error) {
-      console.error('Error creating session:', error)
-      alert('Failed to create session')
     }
   }
 
@@ -91,68 +68,110 @@ export default function ExaminerDashboard() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white shadow rounded-lg p-6 mb-8">
-          <h2 className="text-lg font-semibold mb-4">Create New Session</h2>
-          <div className="flex gap-4">
-            <select
-              value={selectedExam}
-              onChange={(e) => setSelectedExam(e.target.value)}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-            >
-              <option value="">Select an exam</option>
-              {exams.map(exam => (
-                <option key={exam._id} value={exam._id}>
-                  {exam.title} ({exam.cases.length} cases, {exam.duration} min)
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={createSession}
-              className="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
-            >
-              Create Session
-            </button>
-          </div>
-        </div>
-
         <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-lg font-semibold mb-4">Your Exam Sessions</h2>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-semibold">Your Assigned Exam Sessions</h2>
+            <div className="text-sm text-gray-500">
+              Sessions are created and assigned by administrators
+            </div>
+          </div>
+
           {sessions.length === 0 ? (
-            <p className="text-gray-500">No sessions yet. Create one above.</p>
+            <div className="text-center py-12">
+              <svg
+                className="mx-auto h-12 w-12 text-gray-400"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                />
+              </svg>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No sessions assigned</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Contact your administrator to have exam sessions assigned to you.
+              </p>
+            </div>
           ) : (
             <div className="space-y-4">
               {sessions.map(session => (
-                <div key={session._id} className="border rounded-lg p-4">
+                <div key={session._id} className="border rounded-lg p-4 hover:border-indigo-300 transition-colors">
                   <div className="flex justify-between items-start">
-                    <div>
-                      <h3 className="font-semibold">{session.exam.title}</h3>
-                      <p className="text-sm text-gray-600">
-                        Status: <span className={`font-medium ${
-                          session.status === 'active' ? 'text-green-600' :
-                          session.status === 'completed' ? 'text-gray-600' :
-                          session.status === 'paused' ? 'text-yellow-600' :
-                          'text-blue-600'
-                        }`}>{session.status}</span>
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Participants: {session.participants.length}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Created: {new Date(session.createdAt).toLocaleString()}
-                      </p>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg">{session.exam.title}</h3>
+                      <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                        <div>
+                          <span className="text-gray-600">Status:</span>
+                          <span className={`ml-2 font-medium ${
+                            session.status === 'active' ? 'text-green-600' :
+                            session.status === 'completed' ? 'text-gray-600' :
+                            session.status === 'paused' ? 'text-yellow-600' :
+                            'text-blue-600'
+                          }`}>
+                            {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Duration:</span>
+                          <span className="ml-2">{Math.floor(session.timeRemaining / 60)} minutes remaining</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Participants:</span>
+                          <span className="ml-2">{session.participants.length} joined</span>
+                        </div>
+                        {session.assignedStudents && session.assignedStudents.length > 0 && (
+                          <div>
+                            <span className="text-gray-600">Assigned Students:</span>
+                            <span className="ml-2">{session.assignedStudents.length}</span>
+                          </div>
+                        )}
+                        <div className="col-span-2">
+                          <span className="text-gray-600">Created:</span>
+                          <span className="ml-2">{new Date(session.createdAt).toLocaleString()}</span>
+                        </div>
+                      </div>
+
+                      {session.assignedStudents && session.assignedStudents.length > 0 && (
+                        <div className="mt-3 pt-3 border-t">
+                          <p className="text-sm font-medium text-gray-700 mb-2">Assigned Students:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {session.assignedStudents.map((student, idx) => (
+                              <span
+                                key={idx}
+                                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                              >
+                                {student.firstName} {student.lastName}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex gap-2">
+
+                    <div className="flex flex-col gap-2 ml-4">
                       {session.status !== 'completed' && (
                         <button
                           onClick={() => startSession(session._id)}
-                          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+                          className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 whitespace-nowrap"
                         >
-                          {session.status === 'active' ? 'Resume' : 'Start'}
+                          {session.status === 'active' || session.status === 'paused' ? 'Resume' : 'Start'}
+                        </button>
+                      )}
+                      {session.status === 'completed' && (
+                        <button
+                          onClick={() => startSession(session._id)}
+                          className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 whitespace-nowrap"
+                        >
+                          View
                         </button>
                       )}
                       <button
                         onClick={() => deleteSession(session._id)}
-                        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+                        className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 whitespace-nowrap"
                       >
                         Delete
                       </button>
