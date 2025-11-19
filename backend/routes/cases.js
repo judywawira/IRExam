@@ -44,25 +44,39 @@ const upload = multer({
 // Create new case
 router.post('/', authenticate, authorize('admin'), upload.array('images', 10), async (req, res) => {
   try {
-    const { title, clinicalHistory } = req.body;
+    const { title, clinicalHistory, discussionPoints } = req.body;
 
     if (!title || !clinicalHistory) {
       return res.status(400).json({ message: 'Title and clinical history are required' });
     }
 
-    const images = req.files.map(file => ({
+    const images = req.files ? req.files.map(file => ({
       filename: file.filename,
       originalName: file.originalname,
-      path: file.path
-    }));
+      path: file.path,
+      description: ''
+    })) : [];
 
-    const newCase = new Case({
+    const caseData = {
       title,
       clinicalHistory,
       images,
       createdBy: req.userId
-    });
+    };
 
+    // Add discussion points if provided
+    if (discussionPoints) {
+      try {
+        const parsedPoints = typeof discussionPoints === 'string'
+          ? JSON.parse(discussionPoints)
+          : discussionPoints;
+        caseData.discussionPoints = parsedPoints;
+      } catch (e) {
+        console.error('Error parsing discussion points:', e);
+      }
+    }
+
+    const newCase = new Case(caseData);
     await newCase.save();
 
     res.status(201).json({
@@ -109,7 +123,7 @@ router.get('/:id', authenticate, async (req, res) => {
 // Update case
 router.put('/:id', authenticate, authorize('admin'), upload.array('newImages', 10), async (req, res) => {
   try {
-    const { title, clinicalHistory } = req.body;
+    const { title, clinicalHistory, discussionPoints, imageDescriptions } = req.body;
     const caseItem = await Case.findById(req.params.id);
 
     if (!caseItem) {
@@ -119,12 +133,44 @@ router.put('/:id', authenticate, authorize('admin'), upload.array('newImages', 1
     if (title) caseItem.title = title;
     if (clinicalHistory) caseItem.clinicalHistory = clinicalHistory;
 
+    // Update discussion points if provided
+    if (discussionPoints) {
+      try {
+        const parsedPoints = typeof discussionPoints === 'string'
+          ? JSON.parse(discussionPoints)
+          : discussionPoints;
+        caseItem.discussionPoints = parsedPoints;
+      } catch (e) {
+        console.error('Error parsing discussion points:', e);
+      }
+    }
+
+    // Update image descriptions if provided
+    if (imageDescriptions) {
+      try {
+        const parsedDescriptions = typeof imageDescriptions === 'string'
+          ? JSON.parse(imageDescriptions)
+          : imageDescriptions;
+
+        // Update descriptions for existing images
+        Object.entries(parsedDescriptions).forEach(([imageId, description]) => {
+          const image = caseItem.images.find(img => img._id.toString() === imageId);
+          if (image) {
+            image.description = description;
+          }
+        });
+      } catch (e) {
+        console.error('Error parsing image descriptions:', e);
+      }
+    }
+
     // Add new images if provided
     if (req.files && req.files.length > 0) {
       const newImages = req.files.map(file => ({
         filename: file.filename,
         originalName: file.originalname,
-        path: file.path
+        path: file.path,
+        description: ''
       }));
       caseItem.images.push(...newImages);
     }

@@ -13,9 +13,23 @@ const caseSchema = new mongoose.Schema({
     filename: String,
     originalName: String,
     path: String,
+    description: {
+      type: String,
+      default: ''
+    },
     uploadedAt: {
       type: Date,
       default: Date.now
+    }
+  }],
+  discussionPoints: [{
+    point: {
+      type: String,
+      required: true
+    },
+    order: {
+      type: Number,
+      default: 0
     }
   }],
   createdBy: {
