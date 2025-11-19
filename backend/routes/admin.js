@@ -29,11 +29,13 @@ router.get('/examiners', async (req, res) => {
 // Get all users (for admin user management)
 router.get('/users', async (req, res) => {
   try {
-    const { role, approved } = req.query;
+    const { role, approved, archived, institution } = req.query;
     const query = {};
 
     if (role) query.role = role;
     if (approved !== undefined) query.isApproved = approved === 'true';
+    if (archived !== undefined) query.isArchived = archived === 'true';
+    if (institution) query.institution = institution;
 
     const users = await User.find(query)
       .select('-password')
@@ -104,6 +106,67 @@ router.patch('/users/:id/revoke', async (req, res) => {
   } catch (error) {
     console.error('Revoke user error:', error);
     res.status(500).json({ message: 'Server error while revoking user approval' });
+  }
+});
+
+// Archive user (typically for graduated students)
+router.patch('/users/:id/archive', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.isArchived = true;
+    user.archivedDate = new Date();
+    await user.save();
+
+    res.json({
+      message: 'User archived successfully',
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        isArchived: user.isArchived,
+        archivedDate: user.archivedDate
+      }
+    });
+  } catch (error) {
+    console.error('Archive user error:', error);
+    res.status(500).json({ message: 'Server error while archiving user' });
+  }
+});
+
+// Unarchive user
+router.patch('/users/:id/unarchive', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.isArchived = false;
+    user.archivedDate = null;
+    await user.save();
+
+    res.json({
+      message: 'User unarchived successfully',
+      user: {
+        id: user._id,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        role: user.role,
+        isArchived: user.isArchived
+      }
+    });
+  } catch (error) {
+    console.error('Unarchive user error:', error);
+    res.status(500).json({ message: 'Server error while unarchiving user' });
   }
 });
 

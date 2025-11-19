@@ -8,6 +8,7 @@ export default function Register() {
     password: '',
     firstName: '',
     lastName: '',
+    institution: '',
     role: 'student'
   })
   const [error, setError] = useState('')
@@ -77,6 +78,20 @@ export default function Register() {
                 required
                 className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                 value={formData.lastName}
+                onChange={handleChange}
+              />
+            </div>
+            <div>
+              <label htmlFor="institution" className="block text-sm font-medium text-gray-700">
+                Institution (Optional)
+              </label>
+              <input
+                id="institution"
+                name="institution"
+                type="text"
+                className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                placeholder="e.g., University of Kenya"
+                value={formData.institution}
                 onChange={handleChange}
               />
             </div>
