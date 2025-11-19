@@ -13,6 +13,8 @@ export default function ExamSession() {
   const [session, setSession] = useState(null)
   const [currentCase, setCurrentCase] = useState(null)
   const [currentImage, setCurrentImage] = useState(null)
+  const [currentCaseIndex, setCurrentCaseIndex] = useState(0)
+  const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [timeRemaining, setTimeRemaining] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -50,12 +52,15 @@ export default function ExamSession() {
   const fetchSession = async () => {
     try {
       const response = await axios.get(`/api/sessions/${sessionId}`)
-      setSession(response.data.session)
-      setTimeRemaining(response.data.session.timeRemaining)
+      const sessionData = response.data.session
+      setSession(sessionData)
+      setTimeRemaining(sessionData.timeRemaining)
+      setCurrentCaseIndex(sessionData.currentCaseIndex)
+      setCurrentImageIndex(sessionData.currentImageIndex)
       updateCurrentDisplay(
-        response.data.session.exam,
-        response.data.session.currentCaseIndex,
-        response.data.session.currentImageIndex
+        sessionData.exam,
+        sessionData.currentCaseIndex,
+        sessionData.currentImageIndex
       )
     } catch (error) {
       console.error('Error fetching session:', error)
@@ -76,6 +81,8 @@ export default function ExamSession() {
     socketRef.current.on('session-state', (data) => {
       setTimeRemaining(data.timeRemaining)
       setIsRunning(data.status === 'active')
+      setCurrentCaseIndex(data.currentCaseIndex)
+      setCurrentImageIndex(data.currentImageIndex)
       updateCurrentDisplay(data.exam, data.currentCaseIndex, data.currentImageIndex)
     })
 
@@ -97,14 +104,11 @@ export default function ExamSession() {
     })
 
     socketRef.current.on('image-changed', ({ caseIndex, imageIndex }) => {
+      console.log('Image changed:', caseIndex, imageIndex)
+      setCurrentCaseIndex(caseIndex)
+      setCurrentImageIndex(imageIndex)
       if (session?.exam) {
         updateCurrentDisplay(session.exam, caseIndex, imageIndex)
-        // Update session state
-        setSession(prev => ({
-          ...prev,
-          currentCaseIndex: caseIndex,
-          currentImageIndex: imageIndex
-        }))
       }
     })
 
@@ -142,11 +146,18 @@ export default function ExamSession() {
     }
   }
 
-  const navigateImage = (caseIndex, imageIndex) => {
+  const navigateToImage = (caseIndex, imageIndex) => {
+    console.log('Navigating to:', caseIndex, imageIndex)
     if (!session?.exam?.cases) return
     const caseData = session.exam.cases[caseIndex]
     if (!caseData || !caseData.images[imageIndex]) return
 
+    // Update local state immediately for responsive UI
+    setCurrentCaseIndex(caseIndex)
+    setCurrentImageIndex(imageIndex)
+    updateCurrentDisplay(session.exam, caseIndex, imageIndex)
+
+    // Emit socket event to sync with other participants
     socketRef.current.emit('navigate-image', {
       sessionId,
       caseIndex,
@@ -156,26 +167,22 @@ export default function ExamSession() {
 
   const nextImage = () => {
     if (!session?.exam?.cases || !currentCase) return
-    const currentCaseIndex = session.currentCaseIndex
-    const currentImageIndex = session.currentImageIndex
 
     if (currentImageIndex < currentCase.images.length - 1) {
-      navigateImage(currentCaseIndex, currentImageIndex + 1)
+      navigateToImage(currentCaseIndex, currentImageIndex + 1)
     } else if (currentCaseIndex < session.exam.cases.length - 1) {
-      navigateImage(currentCaseIndex + 1, 0)
+      navigateToImage(currentCaseIndex + 1, 0)
     }
   }
 
   const previousImage = () => {
     if (!session?.exam?.cases) return
-    const currentCaseIndex = session.currentCaseIndex
-    const currentImageIndex = session.currentImageIndex
 
     if (currentImageIndex > 0) {
-      navigateImage(currentCaseIndex, currentImageIndex - 1)
+      navigateToImage(currentCaseIndex, currentImageIndex - 1)
     } else if (currentCaseIndex > 0) {
       const prevCase = session.exam.cases[currentCaseIndex - 1]
-      navigateImage(currentCaseIndex - 1, prevCase.images.length - 1)
+      navigateToImage(currentCaseIndex - 1, prevCase.images.length - 1)
     }
   }
 
@@ -186,11 +193,11 @@ export default function ExamSession() {
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center min-h-screen">Loading session...</div>
+    return <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">Loading session...</div>
   }
 
   if (!session) {
-    return <div className="flex items-center justify-center min-h-screen">Session not found</div>
+    return <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">Session not found</div>
   }
 
   return (
@@ -222,12 +229,12 @@ export default function ExamSession() {
       {/* Main Content */}
       <div className="flex h-[calc(100vh-80px)]">
         {/* Main Display Area */}
-        <div className="flex-1 flex flex-col p-6">
+        <div className="flex-1 flex flex-col p-6 overflow-y-auto">
           {/* Clinical History - Displayed First */}
           {currentCase && (
             <div className="bg-gray-800 rounded-lg p-6 mb-6">
               <h3 className="text-lg font-semibold mb-3 text-blue-400">
-                Case {session.currentCaseIndex + 1}: {currentCase.title}
+                Case {currentCaseIndex + 1}: {currentCase.title}
               </h3>
               <div className="bg-gray-900 p-4 rounded">
                 <h4 className="text-sm font-semibold text-gray-400 mb-2">Clinical History</h4>
@@ -237,26 +244,28 @@ export default function ExamSession() {
           )}
 
           {/* Image Display */}
-          <div className="flex-1 flex flex-col items-center justify-center bg-black rounded-lg p-4">
+          <div className="flex-shrink-0 flex flex-col items-center justify-center bg-black rounded-lg p-6 mb-6">
             {currentImage ? (
-              <>
+              <div className="w-full">
                 <img
                   src={`/${currentImage.path}`}
                   alt={currentImage.originalName}
-                  className="w-full h-auto max-h-[55vh] object-contain rounded-lg shadow-lg"
+                  className="w-full h-auto max-h-[50vh] object-contain rounded-lg shadow-lg mx-auto"
                 />
-                <p className="text-center mt-4 text-gray-400">
-                  Case {session.currentCaseIndex + 1} / {session.exam.cases.length} -
-                  Image {session.currentImageIndex + 1} / {currentCase?.images.length}
-                </p>
-                {currentImage.description && (
-                  <p className="text-center mt-2 text-gray-500 text-sm italic">
-                    {currentImage.description}
+                <div className="text-center mt-4">
+                  <p className="text-gray-400">
+                    Case {currentCaseIndex + 1} / {session.exam.cases.length} -
+                    Image {currentImageIndex + 1} / {currentCase?.images.length}
                   </p>
-                )}
-              </>
+                  {currentImage.description && (
+                    <p className="mt-2 text-gray-500 text-sm italic">
+                      {currentImage.description}
+                    </p>
+                  )}
+                </div>
+              </div>
             ) : (
-              <div className="text-center">
+              <div className="text-center py-12">
                 <p className="text-gray-400 text-lg mb-2">No image to display</p>
                 {session.status === 'scheduled' && (
                   <p className="text-gray-500">Waiting for examiner to start the exam...</p>
@@ -265,29 +274,42 @@ export default function ExamSession() {
             )}
           </div>
 
-          {/* Thumbnail Navigation for Examiners */}
-          {isExaminer && currentCase && (
-            <div className="mt-4 bg-gray-800 rounded-lg p-4">
-              <h4 className="text-sm font-semibold mb-3">Images in Current Case</h4>
-              <div className="flex gap-2 overflow-x-auto pb-2">
+          {/* Image Tiles for Examiners */}
+          {isExaminer && currentCase && currentCase.images.length > 0 && (
+            <div className="bg-gray-800 rounded-lg p-6">
+              <h4 className="text-sm font-semibold mb-4 text-gray-300">
+                All Images in Case {currentCaseIndex + 1} ({currentCase.images.length} images)
+              </h4>
+              <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
                 {currentCase.images.map((img, idx) => (
                   <button
                     key={idx}
-                    onClick={() => navigateImage(session.currentCaseIndex, idx)}
-                    className={`flex-shrink-0 relative ${
-                      session.currentImageIndex === idx
-                        ? 'ring-2 ring-blue-500'
-                        : 'opacity-60 hover:opacity-100'
+                    onClick={() => navigateToImage(currentCaseIndex, idx)}
+                    className={`relative aspect-square rounded-lg overflow-hidden transition-all transform hover:scale-105 ${
+                      currentImageIndex === idx
+                        ? 'ring-4 ring-blue-500 shadow-lg shadow-blue-500/50'
+                        : 'ring-1 ring-gray-600 hover:ring-2 hover:ring-gray-400'
                     }`}
+                    title={`Image ${idx + 1}${img.description ? ': ' + img.description : ''}`}
                   >
                     <img
                       src={`/${img.path}`}
-                      alt={`Thumbnail ${idx + 1}`}
-                      className="w-20 h-20 object-cover rounded"
+                      alt={`Image ${idx + 1}`}
+                      className="w-full h-full object-cover"
                     />
-                    <span className="absolute bottom-0 right-0 bg-black bg-opacity-75 text-xs px-1 rounded-tl">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+                    <span className="absolute bottom-1 right-1 bg-black/90 text-white text-xs px-2 py-1 rounded font-semibold">
                       {idx + 1}
                     </span>
+                    {currentImageIndex === idx && (
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                          <svg className="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -305,7 +327,7 @@ export default function ExamSession() {
               {session.status === 'scheduled' && (
                 <button
                   onClick={handleStart}
-                  className="w-full px-4 py-2 bg-green-600 rounded hover:bg-green-700"
+                  className="w-full px-4 py-3 bg-green-600 rounded-lg hover:bg-green-700 font-semibold"
                 >
                   Start Exam
                 </button>
@@ -315,13 +337,13 @@ export default function ExamSession() {
                 <>
                   <button
                     onClick={handlePause}
-                    className="w-full px-4 py-2 bg-yellow-600 rounded hover:bg-yellow-700"
+                    className="w-full px-4 py-3 bg-yellow-600 rounded-lg hover:bg-yellow-700 font-semibold"
                   >
                     Pause Exam
                   </button>
                   <button
                     onClick={handleEnd}
-                    className="w-full px-4 py-2 bg-red-600 rounded hover:bg-red-700"
+                    className="w-full px-4 py-3 bg-red-600 rounded-lg hover:bg-red-700 font-semibold"
                   >
                     End Exam
                   </button>
@@ -331,7 +353,7 @@ export default function ExamSession() {
               {session.status === 'paused' && (
                 <button
                   onClick={handleResume}
-                  className="w-full px-4 py-2 bg-green-600 rounded hover:bg-green-700"
+                  className="w-full px-4 py-3 bg-green-600 rounded-lg hover:bg-green-700 font-semibold"
                 >
                   Resume Exam
                 </button>
@@ -340,38 +362,40 @@ export default function ExamSession() {
               <div className="flex gap-2">
                 <button
                   onClick={previousImage}
-                  disabled={session.currentCaseIndex === 0 && session.currentImageIndex === 0}
-                  className="flex-1 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={currentCaseIndex === 0 && currentImageIndex === 0}
+                  className="flex-1 px-4 py-3 bg-gray-700 rounded-lg hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed font-semibold"
                 >
-                  Previous
+                  ← Previous
                 </button>
                 <button
                   onClick={nextImage}
-                  className="flex-1 px-4 py-2 bg-gray-700 rounded hover:bg-gray-600"
+                  className="flex-1 px-4 py-3 bg-gray-700 rounded-lg hover:bg-gray-600 font-semibold"
                 >
-                  Next
+                  Next →
                 </button>
               </div>
 
               {/* Case Navigator */}
-              <div className="pt-4 border-t border-gray-700">
-                <h4 className="text-sm font-semibold mb-2">Jump to Case</h4>
-                <div className="grid grid-cols-3 gap-2">
-                  {session.exam.cases.map((caseItem, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => navigateImage(idx, 0)}
-                      className={`px-3 py-2 rounded text-sm ${
-                        session.currentCaseIndex === idx
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-700 hover:bg-gray-600'
-                      }`}
-                    >
-                      Case {idx + 1}
-                    </button>
-                  ))}
+              {session.exam.cases.length > 1 && (
+                <div className="pt-4 border-t border-gray-700">
+                  <h4 className="text-sm font-semibold mb-3">Jump to Case</h4>
+                  <div className="grid grid-cols-3 gap-2">
+                    {session.exam.cases.map((caseItem, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => navigateToImage(idx, 0)}
+                        className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                          currentCaseIndex === idx
+                            ? 'bg-blue-600 text-white shadow-lg'
+                            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                        }`}
+                      >
+                        Case {idx + 1}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -383,7 +407,7 @@ export default function ExamSession() {
                 {currentCase.discussionPoints
                   .sort((a, b) => a.order - b.order)
                   .map((dp, idx) => (
-                    <div key={idx} className="bg-gray-900 p-3 rounded">
+                    <div key={idx} className="bg-gray-900 p-3 rounded-lg">
                       <span className="text-yellow-400 font-semibold mr-2">{idx + 1}.</span>
                       <span className="text-gray-300">{dp.point}</span>
                     </div>
@@ -393,8 +417,8 @@ export default function ExamSession() {
           )}
 
           {/* Participants */}
-          <div>
-            <h3 className="text-lg font-semibold mb-2">
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold mb-3">
               Participants ({session.participants.length})
             </h3>
             {session.participants.length === 0 ? (
@@ -402,7 +426,7 @@ export default function ExamSession() {
             ) : (
               <div className="space-y-2">
                 {session.participants.map((p, i) => (
-                  <div key={i} className="text-sm text-gray-300 flex items-center gap-2">
+                  <div key={i} className="text-sm text-gray-300 flex items-center gap-2 bg-gray-900 p-2 rounded">
                     <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                     {p.student?.firstName} {p.student?.lastName}
                   </div>
@@ -413,13 +437,13 @@ export default function ExamSession() {
 
           {/* Assigned Students (For Examiner) */}
           {isExaminer && session.assignedStudents && session.assignedStudents.length > 0 && (
-            <div className="mt-6 pt-6 border-t border-gray-700">
-              <h3 className="text-lg font-semibold mb-2">
+            <div className="pt-6 border-t border-gray-700">
+              <h3 className="text-lg font-semibold mb-3">
                 Assigned Students ({session.assignedStudents.length})
               </h3>
               <div className="space-y-2">
                 {session.assignedStudents.map((student, i) => (
-                  <div key={i} className="text-sm text-gray-300">
+                  <div key={i} className="text-sm text-gray-300 bg-gray-900 p-2 rounded">
                     {student.firstName} {student.lastName}
                   </div>
                 ))}
