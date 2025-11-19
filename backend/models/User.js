@@ -26,6 +26,10 @@ const userSchema = new mongoose.Schema({
     enum: ['admin', 'examiner', 'student'],
     required: true
   },
+  isApproved: {
+    type: Boolean,
+    default: false
+  },
   createdAt: {
     type: Date,
     default: Date.now

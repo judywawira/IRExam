@@ -4,13 +4,18 @@ const ExamSession = require('../models/ExamSession');
 const Exam = require('../models/Exam');
 const { authenticate, authorize } = require('../middleware/auth');
 
-// Create new exam session (Examiner only)
-router.post('/', authenticate, authorize('examiner', 'admin'), async (req, res) => {
+// Create new exam session (Admin only - examiners cannot create sessions)
+// Sessions must be created by admin and assigned to examiners
+router.post('/', authenticate, authorize('admin'), async (req, res) => {
   try {
-    const { examId } = req.body;
+    const { examId, examinerId, assignedStudents } = req.body;
 
     if (!examId) {
       return res.status(400).json({ message: 'Exam ID is required' });
+    }
+
+    if (!examinerId) {
+      return res.status(400).json({ message: 'Examiner ID is required' });
     }
 
     const exam = await Exam.findById(examId);
@@ -20,13 +25,16 @@ router.post('/', authenticate, authorize('examiner', 'admin'), async (req, res) 
 
     const session = new ExamSession({
       exam: examId,
-      examiner: req.userId,
+      examiner: examinerId,
+      assignedStudents: assignedStudents || [],
       status: 'scheduled',
       timeRemaining: exam.duration * 60 // Convert minutes to seconds
     });
 
     await session.save();
     await session.populate('exam');
+    await session.populate('examiner', 'firstName lastName email');
+    await session.populate('assignedStudents', 'firstName lastName email');
 
     res.status(201).json({
       message: 'Exam session created successfully',
@@ -43,14 +51,23 @@ router.get('/', authenticate, async (req, res) => {
   try {
     let query = {};
 
-    // If user is examiner, show only their sessions
+    // If user is examiner, show only their assigned sessions
     if (req.user.role === 'examiner') {
       query.examiner = req.userId;
+    }
+
+    // If user is student, show only sessions they're assigned to
+    if (req.user.role === 'student') {
+      query.$or = [
+        { assignedStudents: req.userId },
+        { assignedStudents: { $size: 0 } } // Also show sessions with no assigned students (open to all)
+      ];
     }
 
     const sessions = await ExamSession.find(query)
       .populate('exam')
       .populate('examiner', 'firstName lastName email')
+      .populate('assignedStudents', 'firstName lastName email')
       .populate('participants.student', 'firstName lastName email')
       .sort({ createdAt: -1 });
 
@@ -70,6 +87,7 @@ router.get('/:id', authenticate, async (req, res) => {
         populate: { path: 'cases' }
       })
       .populate('examiner', 'firstName lastName email')
+      .populate('assignedStudents', 'firstName lastName email')
       .populate('participants.student', 'firstName lastName email');
 
     if (!session) {
@@ -96,6 +114,19 @@ router.post('/:id/join', authenticate, authorize('student'), async (req, res) =>
       return res.status(400).json({ message: 'This session has ended' });
     }
 
+    // Check if session has assigned students and if current student is in the list
+    if (session.assignedStudents && session.assignedStudents.length > 0) {
+      const isAssigned = session.assignedStudents.some(
+        studentId => studentId.toString() === req.userId
+      );
+
+      if (!isAssigned) {
+        return res.status(403).json({
+          message: 'You are not assigned to this session. Please contact your administrator.'
+        });
+      }
+    }
+
     // Check if already joined
     const alreadyJoined = session.participants.some(
       p => p.student.toString() === req.userId
@@ -114,6 +145,7 @@ router.post('/:id/join', authenticate, authorize('student'), async (req, res) =>
       path: 'exam',
       populate: { path: 'cases' }
     });
+    await session.populate('assignedStudents', 'firstName lastName email');
 
     res.json({
       message: 'Joined session successfully',
