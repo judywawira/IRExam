@@ -98,10 +98,8 @@ export default function ExamSession() {
 
     for (let idx = 0; idx < currentCase.images.length; idx++) {
       const img = currentCase.images[idx]
-      const isDicom = img.path.toLowerCase().endsWith('.dcm') ||
-                      img.path.toLowerCase().includes('.dicom')
 
-      if (isDicom) {
+      if (img.isDicom) {
         try {
           const imagePath = img.path.startsWith('/') ? img.path.slice(1) : img.path
           const imageId = `wadouri:${baseUrl}/${imagePath}`
@@ -154,10 +152,7 @@ export default function ExamSession() {
   const loadDicomImage = async () => {
     if (!currentImage || !dicomElementRef.current) return
 
-    const isDicom = currentImage.path.toLowerCase().endsWith('.dcm') ||
-                    currentImage.path.toLowerCase().includes('.dicom')
-
-    if (isDicom) {
+    if (currentImage.isDicom) {
       try {
         const element = dicomElementRef.current
         cornerstone.enable(element)
@@ -400,9 +395,9 @@ export default function ExamSession() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const isDicomFile = (imagePath) => {
-    if (!imagePath) return false
-    return imagePath.toLowerCase().endsWith('.dcm') || imagePath.toLowerCase().includes('.dicom')
+  const isDicomFile = (image) => {
+    if (!image) return false
+    return image.isDicom === true
   }
 
   if (loading) {
@@ -497,7 +492,7 @@ export default function ExamSession() {
 
           {status !== 'scheduled' && viewMode === 'image' && currentImage && (
             <div className="w-full max-w-6xl">
-              {isDicomFile(currentImage.path) ? (
+              {isDicomFile(currentImage) ? (
                 <div
                   ref={dicomElementRef}
                   className="w-full h-[80vh] bg-black rounded-lg"
@@ -588,7 +583,7 @@ export default function ExamSession() {
               <div className="flex-1 flex flex-col items-center justify-center bg-black rounded-lg p-6">
                 {currentImage ? (
                   <div className="w-full">
-                    {isDicomFile(currentImage.path) ? (
+                    {isDicomFile(currentImage) ? (
                       <div>
                         <div
                           ref={dicomElementRef}
@@ -678,7 +673,7 @@ export default function ExamSession() {
                     }`}
                     title={`Image ${idx + 1}${img.description ? ': ' + img.description : ''}`}
                   >
-                    {isDicomFile(img.path) ? (
+                    {isDicomFile(img) ? (
                       dicomThumbnails[idx] ? (
                         <img
                           src={dicomThumbnails[idx]}
@@ -703,7 +698,7 @@ export default function ExamSession() {
                     <span className="absolute bottom-1 right-1 bg-black/90 text-white text-xs px-2 py-1 rounded font-semibold">
                       {idx + 1}
                     </span>
-                    {isDicomFile(img.path) && (
+                    {isDicomFile(img) && (
                       <span className="absolute top-1 left-1 bg-blue-600 text-white text-xs px-2 py-1 rounded font-semibold">
                         DCM
                       </span>
