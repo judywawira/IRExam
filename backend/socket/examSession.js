@@ -22,8 +22,6 @@ module.exports = (io) => {
   });
 
   io.on('connection', (socket) => {
-    console.log(`User connected: ${socket.userId} (${socket.userRole})`);
-
     // Join exam session room
     socket.on('join-session', async (sessionId) => {
       try {
@@ -49,8 +47,6 @@ module.exports = (io) => {
           timeRemaining: session.timeRemaining,
           exam: session.exam
         });
-
-        console.log(`User ${socket.userId} joined session ${sessionId}`);
       } catch (error) {
         console.error('Join session error:', error);
         socket.emit('error', { message: 'Error joining session' });
@@ -99,8 +95,6 @@ module.exports = (io) => {
           startTime: session.startTime,
           timeRemaining: session.timeRemaining
         });
-
-        console.log(`Exam session ${sessionId} started`);
       } catch (error) {
         console.error('Start exam error:', error);
         socket.emit('error', { message: 'Error starting exam' });
@@ -132,8 +126,6 @@ module.exports = (io) => {
           caseIndex,
           imageIndex
         });
-
-        console.log(`Session ${sessionId}: navigated to case ${caseIndex}, image ${imageIndex}`);
       } catch (error) {
         console.error('Navigate image error:', error);
         socket.emit('error', { message: 'Error navigating image' });
@@ -193,7 +185,6 @@ module.exports = (io) => {
         await session.save();
 
         io.to(sessionId).emit('exam-paused');
-        console.log(`Exam session ${sessionId} paused`);
       } catch (error) {
         console.error('Pause exam error:', error);
         socket.emit('error', { message: 'Error pausing exam' });
@@ -219,7 +210,6 @@ module.exports = (io) => {
         await session.save();
 
         io.to(sessionId).emit('exam-resumed');
-        console.log(`Exam session ${sessionId} resumed`);
       } catch (error) {
         console.error('Resume exam error:', error);
         socket.emit('error', { message: 'Error resuming exam' });
@@ -248,8 +238,6 @@ module.exports = (io) => {
         io.to(sessionId).emit('exam-ended', {
           endTime: session.endTime
         });
-
-        console.log(`Exam session ${sessionId} ended`);
       } catch (error) {
         console.error('End exam error:', error);
         socket.emit('error', { message: 'Error ending exam' });
@@ -258,7 +246,7 @@ module.exports = (io) => {
 
     // Handle disconnect
     socket.on('disconnect', () => {
-      console.log(`User disconnected: ${socket.userId}`);
+      // Connection closed
     });
   });
 };
