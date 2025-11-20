@@ -23,10 +23,13 @@ function extractDicomMetadata(filePath) {
       }
     };
 
-    const getTagNumber = (tag, defaultValue = 0) => {
+    const getTagNumber = (tag, defaultValue = undefined) => {
       try {
         const value = dataSet.string(tag);
-        return value ? parseInt(value, 10) : defaultValue;
+        if (!value) return defaultValue;
+        const parsed = parseInt(value, 10);
+        // Return defaultValue if parsing results in NaN
+        return isNaN(parsed) ? defaultValue : parsed;
       } catch (e) {
         return defaultValue;
       }
