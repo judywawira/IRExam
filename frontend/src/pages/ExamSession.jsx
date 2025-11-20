@@ -98,8 +98,10 @@ export default function ExamSession() {
 
     for (let idx = 0; idx < currentCase.images.length; idx++) {
       const img = currentCase.images[idx]
+      const isDicom = img.path.toLowerCase().endsWith('.dcm') ||
+                      img.path.toLowerCase().includes('.dicom')
 
-      if (img.isDicom) {
+      if (isDicom) {
         try {
           const imagePath = img.path.startsWith('/') ? img.path.slice(1) : img.path
           const imageId = `wadouri:${baseUrl}/${imagePath}`
@@ -152,7 +154,10 @@ export default function ExamSession() {
   const loadDicomImage = async () => {
     if (!currentImage || !dicomElementRef.current) return
 
-    if (currentImage.isDicom) {
+    const isDicom = currentImage.path.toLowerCase().endsWith('.dcm') ||
+                    currentImage.path.toLowerCase().includes('.dicom')
+
+    if (isDicom) {
       try {
         const element = dicomElementRef.current
         cornerstone.enable(element)
@@ -226,40 +231,29 @@ export default function ExamSession() {
 
     socketRef.current.on('exam-started', (data) => {
       setStatus('active')
-      if (!isExaminer) {
-        alert(`Exam session for ${user.firstName} ${user.lastName} has started.`)
-      }
     })
 
     socketRef.current.on('exam-paused', () => {
       setStatus('paused')
       if (!isExaminer) {
-        alert(`Exam session for ${user.firstName} ${user.lastName} has been paused by the examiner.`)
+        alert('Exam has been paused by the examiner.')
       }
     })
 
     socketRef.current.on('exam-resumed', () => {
       setStatus('active')
       if (!isExaminer) {
-        alert(`Exam session for ${user.firstName} ${user.lastName} has been resumed.`)
+        alert('Exam has been resumed.')
       }
     })
 
     socketRef.current.on('exam-ended', () => {
       setStatus('completed')
       if (!isExaminer) {
-        alert(`Exam session for ${user.firstName} ${user.lastName} has been completed. Returning to dashboard...`)
+        alert('Exam has ended. Returning to dashboard...')
         setTimeout(() => navigate('/'), 1500)
       } else {
-        // For examiner, show which student's session was completed
-        const pairedStudent = session?.examinerStudentPairs?.find(
-          pair => pair.examiner?._id === user._id
-        )?.student
-        if (pairedStudent) {
-          alert(`Exam session for ${pairedStudent.firstName} ${pairedStudent.lastName} has been completed.`)
-        } else {
-          alert('Exam has ended.')
-        }
+        alert('Exam has ended.')
       }
     })
 
@@ -336,23 +330,7 @@ export default function ExamSession() {
   }
 
   const handleStart = () => {
-    // Get the student name for confirmation
-    const pairedStudent = session?.examinerStudentPairs?.find(
-      pair => pair.examiner?._id === user._id
-    )?.student
-
-    const studentName = pairedStudent
-      ? `${pairedStudent.firstName} ${pairedStudent.lastName}`
-      : session?.assignedStudents?.map(s => `${s.firstName} ${s.lastName}`).join(', ')
-
-    if (studentName) {
-      const confirmStart = confirm(`Start exam session for ${studentName}?`)
-      if (confirmStart) {
-        socketRef.current.emit('start-exam', sessionId)
-      }
-    } else {
-      socketRef.current.emit('start-exam', sessionId)
-    }
+    socketRef.current.emit('start-exam', sessionId)
   }
 
   const handlePause = () => {
@@ -364,20 +342,7 @@ export default function ExamSession() {
   }
 
   const handleEnd = () => {
-    // Get the student name for confirmation
-    const pairedStudent = session?.examinerStudentPairs?.find(
-      pair => pair.examiner?._id === user._id
-    )?.student
-
-    const studentName = pairedStudent
-      ? `${pairedStudent.firstName} ${pairedStudent.lastName}`
-      : session?.assignedStudents?.map(s => `${s.firstName} ${s.lastName}`).join(', ')
-
-    const confirmMessage = studentName
-      ? `Are you sure you want to end the exam session for ${studentName}?`
-      : 'Are you sure you want to end this exam?'
-
-    if (confirm(confirmMessage)) {
+    if (confirm('Are you sure you want to end this exam?')) {
       socketRef.current.emit('end-exam', sessionId)
     }
   }
@@ -435,13 +400,9 @@ export default function ExamSession() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const isDicomFile = (image) => {
-    if (!image) return false
-    // Check database flag first, fallback to file extension for older files
-    if (image.isDicom === true) return true
-    // Fallback: check file extension
-    const path = image.path || image.filename || ''
-    return path.toLowerCase().endsWith('.dcm') || path.toLowerCase().endsWith('.dicom')
+  const isDicomFile = (imagePath) => {
+    if (!imagePath) return false
+    return imagePath.toLowerCase().endsWith('.dcm') || imagePath.toLowerCase().includes('.dicom')
   }
 
   if (loading) {
@@ -474,15 +435,6 @@ export default function ExamSession() {
                 {status === 'paused' && 'Exam Paused'}
                 {status === 'completed' && 'Exam Completed'}
               </p>
-              {/* Display Student Name */}
-              <div className="mt-2">
-                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-600 text-white">
-                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                  Session for: {user.firstName} {user.lastName}
-                </span>
-              </div>
             </div>
             <div className="flex items-center gap-4">
               <div className="text-2xl font-mono font-bold">
@@ -545,7 +497,7 @@ export default function ExamSession() {
 
           {status !== 'scheduled' && viewMode === 'image' && currentImage && (
             <div className="w-full max-w-6xl">
-              {isDicomFile(currentImage) ? (
+              {isDicomFile(currentImage.path) ? (
                 <div
                   ref={dicomElementRef}
                   className="w-full h-[80vh] bg-black rounded-lg"
@@ -576,39 +528,6 @@ export default function ExamSession() {
             <p className="text-sm text-gray-400">
               Examiner View - {status === 'scheduled' ? 'Not Started' : status === 'active' ? 'In Progress' : status === 'paused' ? 'Paused' : 'Completed'}
             </p>
-            {/* Display Current Student */}
-            {(() => {
-              // Check if there's a 1:1 pairing for this examiner
-              const pairedStudent = session.examinerStudentPairs?.find(
-                pair => pair.examiner?._id === user._id
-              )?.student
-
-              if (pairedStudent) {
-                return (
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-600 text-white">
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                      Session for: {pairedStudent.firstName} {pairedStudent.lastName}
-                    </span>
-                  </div>
-                )
-              } else if (session.assignedStudents && session.assignedStudents.length > 0) {
-                // Show all assigned students if no specific pairing
-                return (
-                  <div className="mt-2 flex items-center gap-2 flex-wrap">
-                    <span className="text-sm text-gray-400">Students:</span>
-                    {session.assignedStudents.map((student, i) => (
-                      <span key={i} className="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-gray-700 text-gray-200">
-                        {student.firstName} {student.lastName}
-                      </span>
-                    ))}
-                  </div>
-                )
-              }
-              return null
-            })()}
           </div>
           <div className="flex items-center gap-4">
             <div className="text-2xl font-mono font-bold">
@@ -669,7 +588,7 @@ export default function ExamSession() {
               <div className="flex-1 flex flex-col items-center justify-center bg-black rounded-lg p-6">
                 {currentImage ? (
                   <div className="w-full">
-                    {isDicomFile(currentImage) ? (
+                    {isDicomFile(currentImage.path) ? (
                       <div>
                         <div
                           ref={dicomElementRef}
@@ -759,7 +678,7 @@ export default function ExamSession() {
                     }`}
                     title={`Image ${idx + 1}${img.description ? ': ' + img.description : ''}`}
                   >
-                    {isDicomFile(img) ? (
+                    {isDicomFile(img.path) ? (
                       dicomThumbnails[idx] ? (
                         <img
                           src={dicomThumbnails[idx]}
@@ -784,7 +703,7 @@ export default function ExamSession() {
                     <span className="absolute bottom-1 right-1 bg-black/90 text-white text-xs px-2 py-1 rounded font-semibold">
                       {idx + 1}
                     </span>
-                    {isDicomFile(img) && (
+                    {isDicomFile(img.path) && (
                       <span className="absolute top-1 left-1 bg-blue-600 text-white text-xs px-2 py-1 rounded font-semibold">
                         DCM
                       </span>

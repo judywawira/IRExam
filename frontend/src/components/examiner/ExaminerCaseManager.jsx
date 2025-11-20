@@ -32,9 +32,7 @@ export default function ExaminerCaseManager() {
 
   const { getRootProps, getInputProps } = useDropzone({
     accept: {
-      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.dcm'],
-      'application/zip': ['.zip'],
-      'application/x-zip-compressed': ['.zip']
+      'image/*': ['.jpeg', '.jpg', '.png', '.gif', '.dcm']
     },
     onDrop: acceptedFiles => {
       setSelectedFiles(prev => [...prev, ...acceptedFiles])
@@ -329,7 +327,7 @@ export default function ExaminerCaseManager() {
                   Drag & drop images here, or click to select files
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
-                  Supports: JPEG, PNG, GIF, DICOM, ZIP (with DICOM series)
+                  Supports: JPEG, PNG, GIF, DICOM
                 </p>
               </div>
 
@@ -466,7 +464,7 @@ export default function ExaminerCaseManager() {
                   Drag & drop images here, or click to select files
                 </p>
                 <p className="text-sm text-gray-500 mt-1">
-                  Supports: JPEG, PNG, GIF, DICOM, ZIP (with DICOM series)
+                  Supports: JPEG, PNG, GIF, DICOM
                 </p>
               </div>
 
