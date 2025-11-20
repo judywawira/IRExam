@@ -437,7 +437,11 @@ export default function ExamSession() {
 
   const isDicomFile = (image) => {
     if (!image) return false
-    return image.isDicom === true
+    // Check database flag first, fallback to file extension for older files
+    if (image.isDicom === true) return true
+    // Fallback: check file extension
+    const path = image.path || image.filename || ''
+    return path.toLowerCase().endsWith('.dcm') || path.toLowerCase().endsWith('.dicom')
   }
 
   if (loading) {

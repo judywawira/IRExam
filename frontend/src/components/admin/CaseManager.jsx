@@ -267,6 +267,15 @@ export default function CaseManager() {
     }))
   }
 
+  const isDicomFile = (image) => {
+    if (!image) return false
+    // Check database flag first, fallback to file extension for older files
+    if (image.isDicom === true) return true
+    // Fallback: check file extension
+    const path = image.path || image.filename || ''
+    return path.toLowerCase().endsWith('.dcm') || path.toLowerCase().endsWith('.dicom')
+  }
+
   const filteredCases = cases.filter(caseItem => {
     if (!searchQuery.trim()) return true
 
@@ -670,7 +679,7 @@ export default function CaseManager() {
                           alt={image.originalName}
                           className="w-full h-32 object-cover rounded border"
                         />
-                        {image.isDicom && (
+                        {isDicomFile(image) && (
                           <span className="absolute top-1 left-1 bg-blue-600 text-white text-xs px-2 py-0.5 rounded">
                             DICOM
                           </span>
