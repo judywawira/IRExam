@@ -16,6 +16,8 @@ export default function CaseManager() {
   const [imageDescriptions, setImageDescriptions] = useState({})
   const [discussionPoints, setDiscussionPoints] = useState([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [expandedCases, setExpandedCases] = useState({})
 
   useEffect(() => {
     fetchCases()
@@ -258,28 +260,74 @@ export default function CaseManager() {
     }
   }
 
+  const toggleCaseExpansion = (caseId) => {
+    setExpandedCases(prev => ({
+      ...prev,
+      [caseId]: !prev[caseId]
+    }))
+  }
+
+  const filteredCases = cases.filter(caseItem => {
+    if (!searchQuery.trim()) return true
+
+    const query = searchQuery.toLowerCase()
+    const title = (caseItem.title || '').toLowerCase()
+    const history = (caseItem.clinicalHistory || '').toLowerCase()
+    const creator = `${caseItem.createdBy?.firstName || ''} ${caseItem.createdBy?.lastName || ''}`.toLowerCase()
+
+    return title.includes(query) || history.includes(query) || creator.includes(query)
+  })
+
   if (loading) {
     return <div>Loading cases...</div>
   }
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Manage Cases</h2>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowBulkImport(true)}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-          >
-            Bulk Import
-          </button>
-          <button
-            onClick={() => setShowCreateForm(!showCreateForm)}
-            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-          >
-            {showCreateForm ? 'Cancel' : 'Create New Case'}
-          </button>
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">Manage Cases</h2>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowBulkImport(true)}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            >
+              Bulk Import
+            </button>
+            <button
+              onClick={() => setShowCreateForm(!showCreateForm)}
+              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+            >
+              {showCreateForm ? 'Cancel' : 'Create New Case'}
+            </button>
+          </div>
         </div>
+
+        {/* Search Bar */}
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search cases by title, clinical history, or creator..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <p className="text-sm text-gray-600 mt-2">
+            Found {filteredCases.length} case(s) matching your search.
+          </p>
+        )}
       </div>
 
       {editingCase && (
@@ -549,48 +597,97 @@ export default function CaseManager() {
       )}
 
       <div className="space-y-4">
-        {cases.length === 0 ? (
-          <p className="text-gray-500">No cases yet. Create one above.</p>
+        {filteredCases.length === 0 ? (
+          <p className="text-gray-500">
+            {searchQuery ? 'No cases match your search query.' : 'No cases yet. Create one above.'}
+          </p>
         ) : (
-          cases.map(caseItem => (
-            <div key={caseItem._id} className="bg-white shadow rounded-lg p-6">
-              <div className="flex justify-between items-start mb-4">
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold">{caseItem.title}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{caseItem.clinicalHistory}</p>
-                </div>
-                <div className="flex gap-2">
+          filteredCases.map(caseItem => (
+            <div key={caseItem._id} className="bg-white shadow rounded-lg overflow-hidden">
+              {/* Case Header - Always Visible */}
+              <div className="p-6">
+                <div className="flex justify-between items-start">
                   <button
-                    onClick={() => startEditCase(caseItem)}
-                    className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                    onClick={() => toggleCaseExpansion(caseItem._id)}
+                    className="flex-1 text-left flex items-start gap-3 group"
                   >
-                    Edit
+                    <span className="text-gray-600 mt-1 transition-transform group-hover:text-indigo-600">
+                      {expandedCases[caseItem._id] ? '▼' : '▶'}
+                    </span>
+                    <div className="flex-1">
+                      <h3 className="text-lg font-semibold group-hover:text-indigo-600">
+                        {caseItem.title}
+                      </h3>
+                      <p className="text-sm text-gray-600 mt-1 line-clamp-2">
+                        {caseItem.clinicalHistory}
+                      </p>
+                      <div className="mt-2 text-xs text-gray-500">
+                        {caseItem.images.length} image(s) •
+                        Created {new Date(caseItem.createdAt).toLocaleDateString()} by {caseItem.createdBy?.firstName} {caseItem.createdBy?.lastName}
+                      </div>
+                    </div>
                   </button>
-                  <button
-                    onClick={() => deleteCase(caseItem._id)}
-                    className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 gap-4">
-                {caseItem.images.map((image, index) => (
-                  <div key={index} className="relative group">
-                    <img
-                      src={`/${image.path}`}
-                      alt={image.originalName}
-                      className="w-full h-32 object-cover rounded border"
-                    />
-                    <p className="text-xs text-gray-600 mt-1 truncate">{image.originalName}</p>
+                  <div className="flex gap-2 ml-4">
+                    <button
+                      onClick={() => startEditCase(caseItem)}
+                      className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => deleteCase(caseItem._id)}
+                      className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                    >
+                      Delete
+                    </button>
                   </div>
-                ))}
+                </div>
               </div>
 
-              <div className="mt-4 text-sm text-gray-500">
-                Created: {new Date(caseItem.createdAt).toLocaleDateString()} by {caseItem.createdBy?.firstName} {caseItem.createdBy?.lastName}
-              </div>
+              {/* Expanded Content */}
+              {expandedCases[caseItem._id] && (
+                <div className="px-6 pb-6 border-t border-gray-200 pt-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Clinical History:</h4>
+                  <p className="text-sm text-gray-600 mb-4 whitespace-pre-wrap">{caseItem.clinicalHistory}</p>
+
+                  {caseItem.discussionPoints && caseItem.discussionPoints.length > 0 && (
+                    <div className="mb-4">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">Discussion Points:</h4>
+                      <ul className="list-disc list-inside space-y-1">
+                        {caseItem.discussionPoints.sort((a, b) => a.order - b.order).map((dp, idx) => (
+                          <li key={idx} className="text-sm text-gray-600">{dp.point}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <h4 className="text-sm font-semibold text-gray-700 mb-2">Images ({caseItem.images.length}):</h4>
+                  <div className="grid grid-cols-4 gap-4">
+                    {caseItem.images.map((image, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={`/${image.path}`}
+                          alt={image.originalName}
+                          className="w-full h-32 object-cover rounded border"
+                        />
+                        {image.isDicom && (
+                          <span className="absolute top-1 left-1 bg-blue-600 text-white text-xs px-2 py-0.5 rounded">
+                            DICOM
+                          </span>
+                        )}
+                        <p className="text-xs text-gray-600 mt-1 truncate" title={image.originalName}>
+                          {image.originalName}
+                        </p>
+                        {image.description && (
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-2" title={image.description}>
+                            {image.description}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           ))
         )}
