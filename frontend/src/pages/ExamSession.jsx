@@ -37,7 +37,6 @@ export default function ExamSession() {
   const [viewMode, setViewMode] = useState('history') // 'history', 'image', or 'transition'
   const [showTransition, setShowTransition] = useState(false)
   const [dicomThumbnails, setDicomThumbnails] = useState({})
-  const [expandedCases, setExpandedCases] = useState({})
 
   const isExaminer = user.role === 'examiner' || user.role === 'admin'
   const isRunning = status === 'active'
@@ -74,11 +73,6 @@ export default function ExamSession() {
   useEffect(() => {
     if (session?.exam) {
       updateCurrentDisplay(session.exam, currentCaseIndex, currentImageIndex)
-      // Auto-expand the current case in the navigator
-      setExpandedCases(prev => ({
-        ...prev,
-        [currentCaseIndex]: true
-      }))
     }
   }, [currentCaseIndex, currentImageIndex, session?.exam])
 
@@ -401,20 +395,9 @@ export default function ExamSession() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
-  const toggleCaseExpansion = (caseIndex) => {
-    setExpandedCases(prev => ({
-      ...prev,
-      [caseIndex]: !prev[caseIndex]
-    }))
-  }
-
   const isDicomFile = (image) => {
     if (!image) return false
-    // Check database flag first, fallback to file extension for older files
-    if (image.isDicom === true) return true
-    // Fallback: check file extension
-    const path = image.path || image.filename || ''
-    return path.toLowerCase().endsWith('.dcm')
+    return image.isDicom === true
   }
 
   if (loading) {
@@ -792,67 +775,23 @@ export default function ExamSession() {
               </button>
             </div>
 
-            {/* Enhanced Case Navigator with Collapsible Image Lists */}
-            {session.exam.cases.length > 0 && (
+            {/* Case Navigator */}
+            {session.exam.cases.length > 1 && (
               <div className="pt-4 border-t border-gray-700">
-                <h4 className="text-sm font-semibold mb-3">All Cases</h4>
-                <div className="space-y-2">
+                <h4 className="text-sm font-semibold mb-3">Jump to Case</h4>
+                <div className="grid grid-cols-3 gap-2">
                   {session.exam.cases.map((caseItem, idx) => (
-                    <div key={idx} className="bg-gray-900 rounded-lg overflow-hidden">
-                      <button
-                        onClick={() => toggleCaseExpansion(idx)}
-                        className={`w-full px-3 py-2 flex items-center justify-between text-left transition-all ${
-                          currentCaseIndex === idx
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                        }`}
-                      >
-                        <span className="font-semibold text-sm">
-                          Case {idx + 1}: {caseItem.title}
-                        </span>
-                        <span className="text-xs">
-                          {expandedCases[idx] ? '▼' : '▶'}
-                        </span>
-                      </button>
-
-                      {expandedCases[idx] && (
-                        <div className="p-2 space-y-1">
-                          <button
-                            onClick={() => showHistory(idx)}
-                            className={`w-full px-2 py-1 rounded text-xs flex items-center gap-2 ${
-                              currentCaseIndex === idx && viewMode === 'history'
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-gray-800 hover:bg-gray-700 text-gray-400'
-                            }`}
-                          >
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            Clinical History
-                          </button>
-
-                          {caseItem.images.map((img, imgIdx) => (
-                            <button
-                              key={imgIdx}
-                              onClick={() => navigateToImage(idx, imgIdx + 1)}
-                              className={`w-full px-2 py-1 rounded text-xs flex items-center gap-2 ${
-                                currentCaseIndex === idx && currentImageIndex === imgIdx + 1
-                                  ? 'bg-blue-500 text-white'
-                                  : 'bg-gray-800 hover:bg-gray-700 text-gray-400'
-                              }`}
-                            >
-                              <span className="flex-shrink-0">
-                                {isDicomFile(img) ? '🩻' : '📷'}
-                              </span>
-                              <span className="truncate">
-                                Image {imgIdx + 1}
-                                {img.description && `: ${img.description}`}
-                              </span>
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
+                    <button
+                      key={idx}
+                      onClick={() => showHistory(idx)}
+                      className={`px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                        currentCaseIndex === idx
+                          ? 'bg-blue-600 text-white shadow-lg'
+                          : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                      }`}
+                    >
+                      Case {idx + 1}
+                    </button>
                   ))}
                 </div>
               </div>

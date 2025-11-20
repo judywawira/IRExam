@@ -8,16 +8,6 @@ import Hammer from 'hammerjs'
 cornerstoneTools.external.cornerstone = cornerstone
 cornerstoneTools.external.Hammer = Hammer
 
-// Helper function to check if an image is DICOM
-const isDicomFile = (image) => {
-  if (!image) return false
-  // Check database flag first, fallback to file extension for older files
-  if (image.isDicom === true) return true
-  // Fallback: check file extension
-  const path = image.path || image.filename || ''
-  return path.toLowerCase().endsWith('.dcm')
-}
-
 export default function DicomViewer({
   images = [],
   currentImageIndex = 0,
@@ -41,7 +31,7 @@ export default function DicomViewer({
     if (!images || images.length === 0) return
 
     // Check if we have a DICOM series (multiple images with seriesId)
-    const seriesImages = images.filter(img => isDicomFile(img))
+    const seriesImages = images.filter(img => img.isDicom)
 
     if (seriesImages.length > 1) {
       // Group by seriesId
@@ -63,7 +53,7 @@ export default function DicomViewer({
       const firstSeries = Object.values(seriesMap)[0] || []
       setCurrentSeries(firstSeries)
       setSeriesIndex(0)
-    } else if (images.length === 1 && isDicomFile(images[0])) {
+    } else if (images.length === 1 && images[0].isDicom) {
       setCurrentSeries([images[0]])
       setSeriesIndex(0)
     } else {
@@ -159,7 +149,7 @@ export default function DicomViewer({
     if (currentSeries.length > 0) return // Series handled above
 
     const currentImage = images[currentImageIndex]
-    if (!isDicomFile(currentImage)) return
+    if (!currentImage?.isDicom) return
 
     const loadImage = async () => {
       try {
@@ -243,7 +233,7 @@ export default function DicomViewer({
   }
 
   const currentImage = images[currentImageIndex]
-  if (!isDicomFile(currentImage)) {
+  if (!currentImage?.isDicom) {
     return (
       <div className="w-full h-full flex items-center justify-center bg-gray-800">
         <img
