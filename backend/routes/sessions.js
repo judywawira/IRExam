@@ -74,6 +74,8 @@ router.get('/', authenticate, async (req, res) => {
       .populate('examiner', 'firstName lastName email')
       .populate('assignedStudents', 'firstName lastName email')
       .populate('participants.student', 'firstName lastName email')
+      .populate('examinerStudentPairs.examiner', 'firstName lastName email')
+      .populate('examinerStudentPairs.student', 'firstName lastName email')
       .sort({ createdAt: -1 });
 
     res.json({ sessions });
@@ -93,7 +95,9 @@ router.get('/:id', authenticate, async (req, res) => {
       })
       .populate('examiner', 'firstName lastName email')
       .populate('assignedStudents', 'firstName lastName email')
-      .populate('participants.student', 'firstName lastName email');
+      .populate('participants.student', 'firstName lastName email')
+      .populate('examinerStudentPairs.examiner', 'firstName lastName email')
+      .populate('examinerStudentPairs.student', 'firstName lastName email');
 
     if (!session) {
       return res.status(404).json({ message: 'Session not found' });
