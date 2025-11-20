@@ -604,4 +604,47 @@ router.patch('/sessions/:id/unarchive', async (req, res) => {
   }
 });
 
+// Clone session
+router.post('/sessions/:id/clone', async (req, res) => {
+  try {
+    const session = await ExamSession.findById(req.params.id)
+      .populate('exam')
+      .populate('examiner', 'firstName lastName email')
+      .populate('examiners', 'firstName lastName email')
+      .populate('assignedStudents', 'firstName lastName email');
+
+    if (!session) {
+      return res.status(404).json({ message: 'Session not found' });
+    }
+
+    // Create a new session with the same data but new name
+    const clonedSession = new ExamSession({
+      name: `${session.name} (Copy)`,
+      exam: session.exam._id,
+      examiner: session.examiner._id,
+      examiners: session.examiners.map(e => e._id),
+      assignedStudents: session.assignedStudents.map(s => s._id),
+      examinerStudentPairs: session.examinerStudentPairs || [],
+      status: 'scheduled',
+      timeRemaining: session.exam.duration * 60 // Convert minutes to seconds
+    });
+
+    await clonedSession.save();
+    await clonedSession.populate('exam');
+    await clonedSession.populate('examiner', 'firstName lastName email');
+    await clonedSession.populate('examiners', 'firstName lastName email');
+    await clonedSession.populate('assignedStudents', 'firstName lastName email');
+    await clonedSession.populate('examinerStudentPairs.examiner', 'firstName lastName email');
+    await clonedSession.populate('examinerStudentPairs.student', 'firstName lastName email');
+
+    res.status(201).json({
+      message: 'Session cloned successfully',
+      session: clonedSession
+    });
+  } catch (error) {
+    console.error('Clone session error:', error);
+    res.status(500).json({ message: 'Server error while cloning session' });
+  }
+});
+
 module.exports = router;
