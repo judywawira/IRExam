@@ -56,12 +56,18 @@ export default function SessionManager() {
 
   const handleEdit = (session) => {
     setEditingSession(session)
+    // Convert populated examinerStudentPairs to just IDs
+    const pairs = (session.examinerStudentPairs || []).map(pair => ({
+      examiner: typeof pair.examiner === 'object' ? pair.examiner._id : pair.examiner,
+      student: typeof pair.student === 'object' ? pair.student._id : pair.student
+    }))
+
     setFormData({
       name: session.name || '',
       examId: session.exam?._id || '',
       examinerIds: session.examiners?.map(e => e._id) || [session.examiner?._id] || [],
       assignedStudents: session.assignedStudents?.map(s => s._id) || [],
-      examinerStudentPairs: session.examinerStudentPairs || []
+      examinerStudentPairs: pairs
     })
     setShowCreateForm(true)
   }
@@ -112,21 +118,37 @@ export default function SessionManager() {
   }
 
   const handleExaminerToggle = (examinerId) => {
-    setFormData(prev => ({
-      ...prev,
-      examinerIds: prev.examinerIds.includes(examinerId)
-        ? prev.examinerIds.filter(id => id !== examinerId)
-        : [...prev.examinerIds, examinerId]
-    }))
+    setFormData(prev => {
+      const isRemoving = prev.examinerIds.includes(examinerId)
+
+      return {
+        ...prev,
+        examinerIds: isRemoving
+          ? prev.examinerIds.filter(id => id !== examinerId)
+          : [...prev.examinerIds, examinerId],
+        // Remove any pairings for this examiner if unchecking
+        examinerStudentPairs: isRemoving
+          ? prev.examinerStudentPairs.filter(p => p.examiner !== examinerId)
+          : prev.examinerStudentPairs
+      }
+    })
   }
 
   const handleStudentToggle = (studentId) => {
-    setFormData(prev => ({
-      ...prev,
-      assignedStudents: prev.assignedStudents.includes(studentId)
-        ? prev.assignedStudents.filter(id => id !== studentId)
-        : [...prev.assignedStudents, studentId]
-    }))
+    setFormData(prev => {
+      const isRemoving = prev.assignedStudents.includes(studentId)
+
+      return {
+        ...prev,
+        assignedStudents: isRemoving
+          ? prev.assignedStudents.filter(id => id !== studentId)
+          : [...prev.assignedStudents, studentId],
+        // Remove any pairings for this student if unchecking
+        examinerStudentPairs: isRemoving
+          ? prev.examinerStudentPairs.filter(p => p.student !== studentId)
+          : prev.examinerStudentPairs
+      }
+    })
   }
 
   const handlePairExaminerStudent = (examinerId, studentId) => {
