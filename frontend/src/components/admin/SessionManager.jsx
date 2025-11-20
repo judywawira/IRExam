@@ -9,6 +9,7 @@ export default function SessionManager() {
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [editingSession, setEditingSession] = useState(null)
   const [showArchived, setShowArchived] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const [formData, setFormData] = useState({
     name: '',
     examId: '',
@@ -270,31 +271,79 @@ export default function SessionManager() {
     return pair?.examiner || ''
   }
 
+  const filteredSessions = sessions.filter(session => {
+    if (!searchQuery.trim()) return true
+
+    const query = searchQuery.toLowerCase()
+    const sessionName = (session.name || '').toLowerCase()
+    const examTitle = (session.exam?.title || '').toLowerCase()
+    const examinerName = `${session.examiner?.firstName || ''} ${session.examiner?.lastName || ''}`.toLowerCase()
+    const status = (session.status || '').toLowerCase()
+
+    // Search in assigned students
+    const studentMatch = session.assignedStudents?.some(student =>
+      `${student.firstName} ${student.lastName}`.toLowerCase().includes(query) ||
+      (student.email || '').toLowerCase().includes(query)
+    )
+
+    return sessionName.includes(query) ||
+           examTitle.includes(query) ||
+           examinerName.includes(query) ||
+           status.includes(query) ||
+           studentMatch
+  })
+
   if (loading) {
     return <div>Loading sessions...</div>
   }
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Manage Exam Sessions</h2>
-        <div className="flex gap-3">
-          <button
-            onClick={() => setShowArchived(!showArchived)}
-            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-          >
-            {showArchived ? 'Show Active' : 'Show Archived'}
-          </button>
-          <button
-            onClick={() => {
-              resetForm()
-              setShowCreateForm(!showCreateForm)
-            }}
-            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-          >
-            {showCreateForm ? 'Cancel' : 'Create New Session'}
-          </button>
+      <div className="mb-6">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-bold">Manage Exam Sessions</h2>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            >
+              {showArchived ? 'Show Active' : 'Show Archived'}
+            </button>
+            <button
+              onClick={() => {
+                resetForm()
+                setShowCreateForm(!showCreateForm)
+              }}
+              className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+            >
+              {showCreateForm ? 'Cancel' : 'Create New Session'}
+            </button>
+          </div>
         </div>
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search sessions by name, exam, examiner, student, or status..."
+              className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="px-3 py-2 text-sm text-gray-600 hover:text-gray-800"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        {searchQuery && (
+          <p className="text-sm text-gray-600 mt-2">
+            Searching across {showArchived ? 'archived' : 'active'} sessions. Found {filteredSessions.length} result(s).
+          </p>
+        )}
       </div>
 
       {showCreateForm && (
@@ -464,14 +513,18 @@ export default function SessionManager() {
       )}
 
       <div className="space-y-4">
-        {sessions.length === 0 ? (
+        {filteredSessions.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
             <p>
-              {showArchived ? 'No archived sessions found.' : 'No active sessions yet. Create one above.'}
+              {searchQuery
+                ? 'No sessions match your search query.'
+                : showArchived
+                ? 'No archived sessions found.'
+                : 'No active sessions yet. Create one above.'}
             </p>
           </div>
         ) : (
-          sessions.map(session => (
+          filteredSessions.map(session => (
             <div key={session._id} className="bg-white shadow rounded-lg p-6">
               <div className="flex justify-between items-start mb-4">
                 <div className="flex-1">
