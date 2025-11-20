@@ -103,24 +103,45 @@ export default function ExamSession() {
 
       if (isDicom) {
         try {
-          // Create a temporary canvas element for thumbnail
-          const canvas = document.createElement('canvas')
-          canvas.width = 128
-          canvas.height = 128
-
-          cornerstone.enable(canvas)
-
           const imagePath = img.path.startsWith('/') ? img.path.slice(1) : img.path
           const imageId = `wadouri:${baseUrl}/${imagePath}`
 
+          // Load the DICOM image
           const image = await cornerstone.loadImage(imageId)
-          cornerstone.displayImage(canvas, image)
 
-          // Convert canvas to data URL for storage
-          const dataUrl = canvas.toDataURL('image/png')
-          thumbnails[idx] = dataUrl
+          // Create a temporary div element and add it to DOM (required for cornerstone)
+          const tempDiv = document.createElement('div')
+          tempDiv.style.width = '512px'
+          tempDiv.style.height = '512px'
+          tempDiv.style.position = 'absolute'
+          tempDiv.style.left = '-9999px'
+          document.body.appendChild(tempDiv)
 
-          cornerstone.disable(canvas)
+          // Enable and display the image
+          cornerstone.enable(tempDiv)
+          cornerstone.displayImage(tempDiv, image)
+
+          // Get the canvas that cornerstone created
+          const canvas = tempDiv.querySelector('canvas')
+
+          if (canvas) {
+            // Create a smaller canvas for thumbnail
+            const thumbnailCanvas = document.createElement('canvas')
+            thumbnailCanvas.width = 128
+            thumbnailCanvas.height = 128
+            const ctx = thumbnailCanvas.getContext('2d')
+
+            // Draw the cornerstone canvas to our thumbnail canvas
+            ctx.drawImage(canvas, 0, 0, canvas.width, canvas.height, 0, 0, 128, 128)
+
+            // Convert to data URL
+            const dataUrl = thumbnailCanvas.toDataURL('image/png')
+            thumbnails[idx] = dataUrl
+          }
+
+          // Clean up
+          cornerstone.disable(tempDiv)
+          document.body.removeChild(tempDiv)
         } catch (error) {
           console.error(`Error loading DICOM thumbnail for image ${idx}:`, error)
         }
