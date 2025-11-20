@@ -28,7 +28,7 @@ export default function SessionManager() {
         axios.get(`/api/admin/sessions?archived=${showArchived}`),
         axios.get('/api/admin/examiners'),
         axios.get('/api/exams'),
-        axios.get('/api/admin/users?role=student&approved=true&archived=false')
+        axios.get('/api/admin/users?role=student&archived=false')
       ])
       setSessions(sessionsRes.data.sessions)
       setExaminers(examinersRes.data.examiners)
@@ -351,7 +351,15 @@ export default function SessionManager() {
                 {students.length === 0 ? (
                   <p className="text-sm text-gray-500">No students available</p>
                 ) : (
-                  students.map(student => (
+                  students
+                    .sort((a, b) => {
+                      // Sort approved students first
+                      if (a.isApproved && !b.isApproved) return -1
+                      if (!a.isApproved && b.isApproved) return 1
+                      // Then sort by last name
+                      return (a.lastName || '').localeCompare(b.lastName || '')
+                    })
+                    .map(student => (
                     <label key={student._id} className="flex items-center mb-2 cursor-pointer">
                       <input
                         type="checkbox"
@@ -359,9 +367,14 @@ export default function SessionManager() {
                         onChange={() => handleStudentToggle(student._id)}
                         className="mr-2"
                       />
-                      <span className="text-sm">
+                      <span className="text-sm flex-1">
                         {student.firstName} {student.lastName} ({student.email})
                       </span>
+                      {!student.isApproved && (
+                        <span className="ml-2 px-2 py-0.5 text-xs bg-yellow-100 text-yellow-800 rounded-full">
+                          Pending Approval
+                        </span>
+                      )}
                     </label>
                   ))
                 )}
