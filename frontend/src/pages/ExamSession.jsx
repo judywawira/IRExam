@@ -325,11 +325,33 @@ export default function ExamSession() {
 
           {status !== 'scheduled' && viewMode === 'image' && currentImage && (
             <div className="w-full max-w-6xl">
-              <img
-                src={`/${currentImage.path}`}
-                alt="Medical image"
-                className="w-full h-auto max-h-[80vh] object-contain rounded-lg shadow-2xl mx-auto"
-              />
+              {currentImage.path.toLowerCase().endsWith('.dcm') || currentImage.path.toLowerCase().includes('.dicom') ? (
+                <div className="text-center p-12 bg-gray-800 rounded-lg">
+                  <svg className="w-32 h-32 mx-auto mb-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <h3 className="text-2xl font-bold text-white mb-4">DICOM Medical Image</h3>
+                  <p className="text-gray-400 mb-6">
+                    This is a DICOM format medical image. DICOM files require specialized viewing software.
+                  </p>
+                  <a
+                    href={`/${currentImage.path}`}
+                    download={currentImage.originalName}
+                    className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                  >
+                    Download DICOM File
+                  </a>
+                  <p className="text-sm text-gray-500 mt-4">
+                    File: {currentImage.originalName}
+                  </p>
+                </div>
+              ) : (
+                <img
+                  src={`/${currentImage.path}`}
+                  alt="Medical image"
+                  className="w-full h-auto max-h-[80vh] object-contain rounded-lg shadow-2xl mx-auto"
+                />
+              )}
             </div>
           )}
         </div>
@@ -408,22 +430,57 @@ export default function ExamSession() {
               <div className="flex-1 flex flex-col items-center justify-center bg-black rounded-lg p-6">
                 {currentImage ? (
                   <div className="w-full">
-                    <img
-                      src={`/${currentImage.path}`}
-                      alt={currentImage.originalName}
-                      className="w-full h-auto max-h-[60vh] object-contain rounded-lg shadow-lg mx-auto"
-                    />
-                    <div className="text-center mt-4">
-                      <p className="text-gray-400">
-                        Case {currentCaseIndex + 1} / {session.exam.cases.length} -
-                        Image {currentImageIndex + 1} / {currentCase?.images.length}
-                      </p>
-                      {currentImage.description && (
-                        <p className="mt-2 text-gray-500 text-sm italic">
-                          {currentImage.description}
+                    {currentImage.path.toLowerCase().endsWith('.dcm') || currentImage.path.toLowerCase().includes('.dicom') ? (
+                      <div className="text-center p-12 bg-gray-800 rounded-lg">
+                        <svg className="w-32 h-32 mx-auto mb-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <h3 className="text-2xl font-bold text-white mb-4">DICOM Medical Image</h3>
+                        <p className="text-gray-400 mb-6">
+                          This is a DICOM format medical image. DICOM files require specialized viewing software.
                         </p>
-                      )}
-                    </div>
+                        <a
+                          href={`/${currentImage.path}`}
+                          download={currentImage.originalName}
+                          className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                        >
+                          Download DICOM File
+                        </a>
+                        <p className="text-sm text-gray-500 mt-4">
+                          File: {currentImage.originalName}
+                        </p>
+                        {currentImage.description && (
+                          <p className="mt-4 text-gray-400 text-sm italic">
+                            Note: {currentImage.description}
+                          </p>
+                        )}
+                        <div className="text-center mt-6">
+                          <p className="text-gray-400 text-sm">
+                            Case {currentCaseIndex + 1} / {session.exam.cases.length} -
+                            Image {currentImageIndex + 1} / {currentCase?.images.length}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <img
+                          src={`/${currentImage.path}`}
+                          alt={currentImage.originalName}
+                          className="w-full h-auto max-h-[60vh] object-contain rounded-lg shadow-lg mx-auto"
+                        />
+                        <div className="text-center mt-4">
+                          <p className="text-gray-400">
+                            Case {currentCaseIndex + 1} / {session.exam.cases.length} -
+                            Image {currentImageIndex + 1} / {currentCase?.images.length}
+                          </p>
+                          {currentImage.description && (
+                            <p className="mt-2 text-gray-500 text-sm italic">
+                              {currentImage.description}
+                            </p>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-12">
