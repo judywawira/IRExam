@@ -242,6 +242,19 @@ export default function SessionManager() {
     }
   }
 
+  const cloneSession = async (sessionId) => {
+    if (!confirm('Are you sure you want to clone this session?')) return
+
+    try {
+      const response = await axios.post(`/api/admin/sessions/${sessionId}/clone`)
+      alert('Session cloned successfully')
+      fetchData()
+    } catch (error) {
+      console.error('Error cloning session:', error)
+      alert('Failed to clone session')
+    }
+  }
+
   const getStatusColor = (status) => {
     const colors = {
       scheduled: 'bg-blue-100 text-blue-800',
@@ -590,6 +603,15 @@ export default function SessionManager() {
                       className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
                     >
                       Edit
+                    </button>
+                  )}
+
+                  {!session.isArchived && (
+                    <button
+                      onClick={() => cloneSession(session._id)}
+                      className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm"
+                    >
+                      Clone
                     </button>
                   )}
 

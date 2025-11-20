@@ -24,6 +24,7 @@ export default function ExamSession() {
   const navigate = useNavigate()
   const socketRef = useRef(null)
   const dicomElementRef = useRef(null)
+  const thumbnailCanvasRefs = useRef([])
 
   const [session, setSession] = useState(null)
   const [currentCase, setCurrentCase] = useState(null)
@@ -35,6 +36,7 @@ export default function ExamSession() {
   const [loading, setLoading] = useState(true)
   const [viewMode, setViewMode] = useState('history') // 'history', 'image', or 'transition'
   const [showTransition, setShowTransition] = useState(false)
+  const [dicomThumbnails, setDicomThumbnails] = useState({})
 
   const isExaminer = user.role === 'examiner' || user.role === 'admin'
   const isRunning = status === 'active'
@@ -80,6 +82,53 @@ export default function ExamSession() {
       loadDicomImage()
     }
   }, [currentImage])
+
+  // Load DICOM thumbnails when current case changes
+  useEffect(() => {
+    if (currentCase && currentCase.images) {
+      loadDicomThumbnails()
+    }
+  }, [currentCase])
+
+  const loadDicomThumbnails = async () => {
+    if (!currentCase || !currentCase.images) return
+
+    const baseUrl = import.meta.env.VITE_API_URL || window.location.origin
+    const thumbnails = {}
+
+    for (let idx = 0; idx < currentCase.images.length; idx++) {
+      const img = currentCase.images[idx]
+      const isDicom = img.path.toLowerCase().endsWith('.dcm') ||
+                      img.path.toLowerCase().includes('.dicom')
+
+      if (isDicom) {
+        try {
+          // Create a temporary canvas element for thumbnail
+          const canvas = document.createElement('canvas')
+          canvas.width = 128
+          canvas.height = 128
+
+          cornerstone.enable(canvas)
+
+          const imagePath = img.path.startsWith('/') ? img.path.slice(1) : img.path
+          const imageId = `wadouri:${baseUrl}/${imagePath}`
+
+          const image = await cornerstone.loadImage(imageId)
+          cornerstone.displayImage(canvas, image)
+
+          // Convert canvas to data URL for storage
+          const dataUrl = canvas.toDataURL('image/png')
+          thumbnails[idx] = dataUrl
+
+          cornerstone.disable(canvas)
+        } catch (error) {
+          console.error(`Error loading DICOM thumbnail for image ${idx}:`, error)
+        }
+      }
+    }
+
+    setDicomThumbnails(thumbnails)
+  }
 
   const loadDicomImage = async () => {
     if (!currentImage || !dicomElementRef.current) return
@@ -595,11 +644,19 @@ export default function ExamSession() {
                     title={`Image ${idx + 1}${img.description ? ': ' + img.description : ''}`}
                   >
                     {isDicomFile(img.path) ? (
-                      <div className="w-full h-full bg-gray-700 flex items-center justify-center">
-                        <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                      </div>
+                      dicomThumbnails[idx] ? (
+                        <img
+                          src={dicomThumbnails[idx]}
+                          alt={`DICOM Image ${idx + 1}`}
+                          className="w-full h-full object-cover bg-gray-900"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gray-700 flex items-center justify-center">
+                          <svg className="w-8 h-8 text-blue-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </div>
+                      )
                     ) : (
                       <img
                         src={`/${img.path}`}
