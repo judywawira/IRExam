@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 
 const examSessionSchema = new mongoose.Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
   exam: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Exam',
@@ -11,10 +16,21 @@ const examSessionSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
+  examiners: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
   status: {
     type: String,
     enum: ['scheduled', 'active', 'paused', 'completed'],
     default: 'scheduled'
+  },
+  isArchived: {
+    type: Boolean,
+    default: false
+  },
+  archivedDate: {
+    type: Date
   },
   currentCaseIndex: {
     type: Number,
@@ -36,6 +52,16 @@ const examSessionSchema = new mongoose.Schema({
   assignedStudents: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
+  }],
+  examinerStudentPairs: [{
+    examiner: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    student: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    }
   }],
   participants: [{
     student: {

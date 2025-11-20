@@ -18,7 +18,8 @@ export default function ExamSession() {
   const [timeRemaining, setTimeRemaining] = useState(0)
   const [isRunning, setIsRunning] = useState(false)
   const [loading, setLoading] = useState(true)
-  const [viewMode, setViewMode] = useState('history') // 'history' or 'image'
+  const [viewMode, setViewMode] = useState('history') // 'history', 'image', or 'transition'
+  const [showTransition, setShowTransition] = useState(false)
 
   const isExaminer = user.role === 'examiner' || user.role === 'admin'
 
@@ -165,18 +166,40 @@ export default function ExamSession() {
     const caseData = session.exam.cases[caseIndex]
     if (!caseData || !caseData.images[imageIndex]) return
 
-    // Update local state immediately for responsive UI
-    setCurrentCaseIndex(caseIndex)
-    setCurrentImageIndex(imageIndex)
-    setViewMode('image')
-    updateCurrentDisplay(session.exam, caseIndex, imageIndex)
+    // Show transition screen for students when moving to a different case
+    if (caseIndex !== currentCaseIndex && !isExaminer) {
+      setShowTransition(true)
+      setViewMode('transition')
 
-    // Emit socket event to sync with other participants
-    socketRef.current.emit('navigate-image', {
-      sessionId,
-      caseIndex,
-      imageIndex
-    })
+      // Show transition for 2 seconds, then show image
+      setTimeout(() => {
+        setCurrentCaseIndex(caseIndex)
+        setCurrentImageIndex(imageIndex)
+        setViewMode('image')
+        updateCurrentDisplay(session.exam, caseIndex, imageIndex)
+        setShowTransition(false)
+
+        // Emit socket event to sync with other participants
+        socketRef.current.emit('navigate-image', {
+          sessionId,
+          caseIndex,
+          imageIndex
+        })
+      }, 2000)
+    } else {
+      // Examiner or same case - navigate immediately
+      setCurrentCaseIndex(caseIndex)
+      setCurrentImageIndex(imageIndex)
+      setViewMode('image')
+      updateCurrentDisplay(session.exam, caseIndex, imageIndex)
+
+      // Emit socket event to sync with other participants
+      socketRef.current.emit('navigate-image', {
+        sessionId,
+        caseIndex,
+        imageIndex
+      })
+    }
   }
 
   const showHistory = (caseIndex) => {
@@ -185,13 +208,28 @@ export default function ExamSession() {
     const caseData = session.exam.cases[caseIndex]
     if (!caseData) return
 
-    // Update to show history view
-    if (caseIndex !== currentCaseIndex) {
-      setCurrentCaseIndex(caseIndex)
-      setCurrentImageIndex(0)
-      updateCurrentDisplay(session.exam, caseIndex, 0)
+    // Show transition screen when moving to a different case
+    if (caseIndex !== currentCaseIndex && !isExaminer) {
+      setShowTransition(true)
+      setViewMode('transition')
+
+      // Show transition for 2 seconds, then show history
+      setTimeout(() => {
+        setCurrentCaseIndex(caseIndex)
+        setCurrentImageIndex(0)
+        updateCurrentDisplay(session.exam, caseIndex, 0)
+        setShowTransition(false)
+        setViewMode('history')
+      }, 2000)
+    } else {
+      // Examiner or same case - go directly to history
+      if (caseIndex !== currentCaseIndex) {
+        setCurrentCaseIndex(caseIndex)
+        setCurrentImageIndex(0)
+        updateCurrentDisplay(session.exam, caseIndex, 0)
+      }
+      setViewMode('history')
     }
-    setViewMode('history')
   }
 
   const nextImage = () => {
@@ -264,14 +302,16 @@ export default function ExamSession() {
             <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-blue-900 to-gray-900 rounded-lg p-12">
               <div className="max-w-4xl w-full">
                 <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-                  <div className="mb-6">
-                    <h2 className="text-3xl font-bold text-blue-300 mb-2">
-                      Case {currentCaseIndex + 1}
-                    </h2>
-                    <h3 className="text-2xl font-semibold text-white">
-                      {currentCase.title}
-                    </h3>
-                  </div>
+                  {isExaminer && (
+                    <div className="mb-6">
+                      <h2 className="text-3xl font-bold text-blue-300 mb-2">
+                        Case {currentCaseIndex + 1}
+                      </h2>
+                      <h3 className="text-2xl font-semibold text-white">
+                        {currentCase.title}
+                      </h3>
+                    </div>
+                  )}
                   <div className="bg-white/5 rounded-xl p-6 border border-white/10">
                     <h4 className="text-lg font-semibold text-blue-400 mb-4">Clinical History</h4>
                     <p className="text-gray-200 text-lg leading-relaxed whitespace-pre-wrap">
@@ -290,11 +330,32 @@ export default function ExamSession() {
             </div>
           )}
 
+          {/* Case Transition Screen */}
+          {viewMode === 'transition' && (
+            <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-indigo-900 via-purple-900 to-gray-900 rounded-lg">
+              <div className="text-center animate-fade-in">
+                <div className="mb-8">
+                  <svg className="w-32 h-32 mx-auto text-blue-400 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <h2 className="text-4xl font-bold text-white mb-4">
+                  Moving to Next Case
+                </h2>
+                <div className="flex items-center justify-center gap-2">
+                  <div className="w-3 h-3 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                  <div className="w-3 h-3 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                  <div className="w-3 h-3 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Image Display View */}
           {viewMode === 'image' && (
             <div className="flex-1 flex flex-col">
-              {/* Case Title */}
-              {currentCase && (
+              {/* Case Title - Examiner Only */}
+              {isExaminer && currentCase && (
                 <div className="bg-gray-800 rounded-lg p-4 mb-4">
                   <h3 className="text-lg font-semibold text-blue-400">
                     Case {currentCaseIndex + 1}: {currentCase.title}
@@ -312,11 +373,17 @@ export default function ExamSession() {
                       className="w-full h-auto max-h-[60vh] object-contain rounded-lg shadow-lg mx-auto"
                     />
                     <div className="text-center mt-4">
-                      <p className="text-gray-400">
-                        Case {currentCaseIndex + 1} / {session.exam.cases.length} -
-                        Image {currentImageIndex + 1} / {currentCase?.images.length}
-                      </p>
-                      {currentImage.description && (
+                      {isExaminer ? (
+                        <p className="text-gray-400">
+                          Case {currentCaseIndex + 1} / {session.exam.cases.length} -
+                          Image {currentImageIndex + 1} / {currentCase?.images.length}
+                        </p>
+                      ) : (
+                        <p className="text-gray-400">
+                          Image {currentImageIndex + 1} / {currentCase?.images.length}
+                        </p>
+                      )}
+                      {isExaminer && currentImage.description && (
                         <p className="mt-2 text-gray-500 text-sm italic">
                           {currentImage.description}
                         </p>

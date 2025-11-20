@@ -4,32 +4,36 @@ import axios from 'axios'
 export default function SessionManager() {
   const [sessions, setSessions] = useState([])
   const [examiners, setExaminers] = useState([])
+  const [students, setStudents] = useState([])
   const [exams, setExams] = useState([])
   const [showCreateForm, setShowCreateForm] = useState(false)
+  const [editingSession, setEditingSession] = useState(null)
+  const [showArchived, setShowArchived] = useState(false)
   const [formData, setFormData] = useState({
+    name: '',
     examId: '',
-    examinerId: ''
+    examinerIds: [],
+    assignedStudents: [],
+    examinerStudentPairs: []
   })
   const [loading, setLoading] = useState(true)
-  const [reassignData, setReassignData] = useState({
-    sessionId: null,
-    examinerId: ''
-  })
 
   useEffect(() => {
     fetchData()
-  }, [])
+  }, [showArchived])
 
   const fetchData = async () => {
     try {
-      const [sessionsRes, examinersRes, examsRes] = await Promise.all([
-        axios.get('/api/admin/sessions'),
+      const [sessionsRes, examinersRes, examsRes, studentsRes] = await Promise.all([
+        axios.get(`/api/admin/sessions?archived=${showArchived}`),
         axios.get('/api/admin/examiners'),
-        axios.get('/api/exams')
+        axios.get('/api/exams'),
+        axios.get('/api/admin/users?role=student&approved=true&archived=false')
       ])
       setSessions(sessionsRes.data.sessions)
       setExaminers(examinersRes.data.examiners)
       setExams(examsRes.data.exams)
+      setStudents(studentsRes.data.users)
     } catch (error) {
       console.error('Error fetching data:', error)
       alert('Failed to fetch data')
@@ -38,62 +42,176 @@ export default function SessionManager() {
     }
   }
 
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      examId: '',
+      examinerIds: [],
+      assignedStudents: [],
+      examinerStudentPairs: []
+    })
+    setEditingSession(null)
+    setShowCreateForm(false)
+  }
+
+  const handleEdit = (session) => {
+    setEditingSession(session)
+    setFormData({
+      name: session.name || '',
+      examId: session.exam?._id || '',
+      examinerIds: session.examiners?.map(e => e._id) || [session.examiner?._id] || [],
+      assignedStudents: session.assignedStudents?.map(s => s._id) || [],
+      examinerStudentPairs: session.examinerStudentPairs || []
+    })
+    setShowCreateForm(true)
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
 
-    if (!formData.examId || !formData.examinerId) {
-      alert('Please select both an exam and an examiner')
+    if (!formData.name.trim() || !formData.examId) {
+      alert('Please provide a session name and select an exam')
+      return
+    }
+
+    if (formData.examinerIds.length === 0) {
+      alert('Please select at least one examiner')
       return
     }
 
     try {
-      const response = await axios.post('/api/admin/sessions', {
-        examId: formData.examId,
-        examinerId: formData.examinerId
-      })
-      setSessions([response.data.session, ...sessions])
-      setFormData({ examId: '', examinerId: '' })
-      setShowCreateForm(false)
-      alert('Exam session created successfully')
+      if (editingSession) {
+        // Update existing session
+        const response = await axios.patch(`/api/admin/sessions/${editingSession._id}`, {
+          name: formData.name,
+          examId: formData.examId,
+          examinerIds: formData.examinerIds,
+          assignedStudents: formData.assignedStudents,
+          examinerStudentPairs: formData.examinerStudentPairs
+        })
+        setSessions(sessions.map(s => s._id === editingSession._id ? response.data.session : s))
+        alert('Session updated successfully')
+      } else {
+        // Create new session
+        const response = await axios.post('/api/admin/sessions', {
+          name: formData.name,
+          examId: formData.examId,
+          examinerIds: formData.examinerIds,
+          assignedStudents: formData.assignedStudents,
+          examinerStudentPairs: formData.examinerStudentPairs
+        })
+        setSessions([response.data.session, ...sessions])
+        alert('Session created successfully')
+      }
+      resetForm()
+      fetchData()
     } catch (error) {
-      console.error('Error creating session:', error)
-      alert(error.response?.data?.message || 'Failed to create session')
+      console.error('Error saving session:', error)
+      alert(error.response?.data?.message || 'Failed to save session')
     }
   }
 
-  const handleReassign = async (sessionId) => {
-    if (!reassignData.examinerId) {
-      alert('Please select an examiner')
-      return
-    }
+  const handleExaminerToggle = (examinerId) => {
+    setFormData(prev => ({
+      ...prev,
+      examinerIds: prev.examinerIds.includes(examinerId)
+        ? prev.examinerIds.filter(id => id !== examinerId)
+        : [...prev.examinerIds, examinerId]
+    }))
+  }
 
-    try {
-      const response = await axios.patch(
-        `/api/admin/sessions/${sessionId}/assign-examiner`,
-        { examinerId: reassignData.examinerId }
+  const handleStudentToggle = (studentId) => {
+    setFormData(prev => ({
+      ...prev,
+      assignedStudents: prev.assignedStudents.includes(studentId)
+        ? prev.assignedStudents.filter(id => id !== studentId)
+        : [...prev.assignedStudents, studentId]
+    }))
+  }
+
+  const handlePairExaminerStudent = (examinerId, studentId) => {
+    setFormData(prev => {
+      const existingPairIndex = prev.examinerStudentPairs.findIndex(
+        p => p.student === studentId
       )
 
-      setSessions(sessions.map(s =>
-        s._id === sessionId ? response.data.session : s
-      ))
-      setReassignData({ sessionId: null, examinerId: '' })
-      alert('Examiner reassigned successfully')
+      let newPairs = [...prev.examinerStudentPairs]
+
+      if (existingPairIndex >= 0) {
+        // Update existing pair
+        newPairs[existingPairIndex] = { examiner: examinerId, student: studentId }
+      } else {
+        // Add new pair
+        newPairs.push({ examiner: examinerId, student: studentId })
+      }
+
+      return { ...prev, examinerStudentPairs: newPairs }
+    })
+  }
+
+  const removePair = (studentId) => {
+    setFormData(prev => ({
+      ...prev,
+      examinerStudentPairs: prev.examinerStudentPairs.filter(p => p.student !== studentId)
+    }))
+  }
+
+  const deleteOrArchiveSession = async (session) => {
+    const hasStudents = (session.assignedStudents?.length > 0) ||
+                        (session.participants?.length > 0) ||
+                        (session.examinerStudentPairs?.length > 0)
+
+    const message = hasStudents
+      ? 'This session has students assigned. It will be archived instead of deleted. Continue?'
+      : 'Are you sure you want to delete this session?'
+
+    if (!confirm(message)) return
+
+    try {
+      const response = await axios.delete(`/api/admin/sessions/${session._id}`)
+
+      if (response.data.archived) {
+        // Session was archived, update in list
+        setSessions(sessions.map(s =>
+          s._id === session._id ? response.data.session : s
+        ))
+        alert('Session has been archived')
+      } else {
+        // Session was deleted, remove from list
+        setSessions(sessions.filter(s => s._id !== session._id))
+        alert('Session deleted successfully')
+      }
+
+      fetchData()
     } catch (error) {
-      console.error('Error reassigning examiner:', error)
-      alert(error.response?.data?.message || 'Failed to reassign examiner')
+      console.error('Error deleting/archiving session:', error)
+      alert('Failed to delete/archive session')
     }
   }
 
-  const deleteSession = async (sessionId) => {
-    if (!confirm('Are you sure you want to delete this session?')) return
+  const archiveSession = async (sessionId) => {
+    if (!confirm('Are you sure you want to archive this session?')) return
 
     try {
-      await axios.delete(`/api/admin/sessions/${sessionId}`)
-      setSessions(sessions.filter(s => s._id !== sessionId))
-      alert('Session deleted successfully')
+      await axios.patch(`/api/admin/sessions/${sessionId}/archive`)
+      alert('Session archived successfully')
+      fetchData()
     } catch (error) {
-      console.error('Error deleting session:', error)
-      alert('Failed to delete session')
+      console.error('Error archiving session:', error)
+      alert('Failed to archive session')
+    }
+  }
+
+  const unarchiveSession = async (sessionId) => {
+    if (!confirm('Are you sure you want to unarchive this session?')) return
+
+    try {
+      await axios.patch(`/api/admin/sessions/${sessionId}/unarchive`)
+      alert('Session unarchived successfully')
+      fetchData()
+    } catch (error) {
+      console.error('Error unarchiving session:', error)
+      alert('Failed to unarchive session')
     }
   }
 
@@ -107,6 +225,11 @@ export default function SessionManager() {
     return colors[status] || 'bg-gray-100 text-gray-800'
   }
 
+  const getPairedExaminer = (studentId) => {
+    const pair = formData.examinerStudentPairs.find(p => p.student === studentId)
+    return pair?.examiner || ''
+  }
+
   if (loading) {
     return <div>Loading sessions...</div>
   }
@@ -115,18 +238,45 @@ export default function SessionManager() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Manage Exam Sessions</h2>
-        <button
-          onClick={() => setShowCreateForm(!showCreateForm)}
-          className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-        >
-          {showCreateForm ? 'Cancel' : 'Create New Session'}
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowArchived(!showArchived)}
+            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+          >
+            {showArchived ? 'Show Active' : 'Show Archived'}
+          </button>
+          <button
+            onClick={() => {
+              resetForm()
+              setShowCreateForm(!showCreateForm)
+            }}
+            className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+          >
+            {showCreateForm ? 'Cancel' : 'Create New Session'}
+          </button>
+        </div>
       </div>
 
       {showCreateForm && (
         <div className="bg-white shadow rounded-lg p-6 mb-6">
-          <h3 className="text-lg font-semibold mb-4">Create New Exam Session</h3>
+          <h3 className="text-lg font-semibold mb-4">
+            {editingSession ? 'Edit Exam Session' : 'Create New Exam Session'}
+          </h3>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Session Name *
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="e.g., Radiology Final Exam - Group A"
+                required
+              />
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Select Exam *
@@ -147,30 +297,115 @@ export default function SessionManager() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Assign Examiner *
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Examiners * (Multiple allowed)
               </label>
-              <select
-                value={formData.examinerId}
-                onChange={(e) => setFormData({ ...formData, examinerId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                required
-              >
-                <option value="">-- Select an examiner --</option>
-                {examiners.map(examiner => (
-                  <option key={examiner._id} value={examiner._id}>
-                    {examiner.firstName} {examiner.lastName} ({examiner.email})
-                  </option>
-                ))}
-              </select>
+              <div className="border border-gray-300 rounded-md p-3 max-h-40 overflow-y-auto">
+                {examiners.length === 0 ? (
+                  <p className="text-sm text-gray-500">No examiners available</p>
+                ) : (
+                  examiners.map(examiner => (
+                    <label key={examiner._id} className="flex items-center mb-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.examinerIds.includes(examiner._id)}
+                        onChange={() => handleExaminerToggle(examiner._id)}
+                        className="mr-2"
+                      />
+                      <span className="text-sm">
+                        {examiner.firstName} {examiner.lastName} ({examiner.email})
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
             </div>
 
-            <button
-              type="submit"
-              className="w-full px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-            >
-              Create Session
-            </button>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Assign Students (Optional)
+              </label>
+              <div className="border border-gray-300 rounded-md p-3 max-h-40 overflow-y-auto">
+                {students.length === 0 ? (
+                  <p className="text-sm text-gray-500">No students available</p>
+                ) : (
+                  students.map(student => (
+                    <label key={student._id} className="flex items-center mb-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.assignedStudents.includes(student._id)}
+                        onChange={() => handleStudentToggle(student._id)}
+                        className="mr-2"
+                      />
+                      <span className="text-sm">
+                        {student.firstName} {student.lastName} ({student.email})
+                      </span>
+                    </label>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {formData.examinerIds.length > 0 && formData.assignedStudents.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Examiner-Student Pairing (Optional 1:1 Matching)
+                </label>
+                <div className="border border-gray-300 rounded-md p-3 max-h-60 overflow-y-auto">
+                  {formData.assignedStudents.map(studentId => {
+                    const student = students.find(s => s._id === studentId)
+                    if (!student) return null
+
+                    return (
+                      <div key={studentId} className="flex items-center gap-3 mb-3">
+                        <span className="text-sm flex-1">
+                          {student.firstName} {student.lastName}
+                        </span>
+                        <select
+                          value={getPairedExaminer(studentId)}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handlePairExaminerStudent(e.target.value, studentId)
+                            } else {
+                              removePair(studentId)
+                            }
+                          }}
+                          className="px-2 py-1 text-sm border border-gray-300 rounded"
+                        >
+                          <option value="">-- No pairing --</option>
+                          {formData.examinerIds.map(examinerId => {
+                            const examiner = examiners.find(e => e._id === examinerId)
+                            return (
+                              <option key={examinerId} value={examinerId}>
+                                {examiner?.firstName} {examiner?.lastName}
+                              </option>
+                            )
+                          })}
+                        </select>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                type="submit"
+                className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
+              >
+                {editingSession ? 'Update Session' : 'Create Session'}
+              </button>
+              {editingSession && (
+                <button
+                  type="button"
+                  onClick={resetForm}
+                  className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
           </form>
         </div>
       )}
@@ -178,7 +413,9 @@ export default function SessionManager() {
       <div className="space-y-4">
         {sessions.length === 0 ? (
           <div className="text-center text-gray-500 py-8">
-            <p>No exam sessions yet. Create one above.</p>
+            <p>
+              {showArchived ? 'No archived sessions found.' : 'No active sessions yet. Create one above.'}
+            </p>
           </div>
         ) : (
           sessions.map(session => (
@@ -186,20 +423,45 @@ export default function SessionManager() {
               <div className="flex justify-between items-start mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
-                    <h3 className="text-lg font-semibold">{session.exam?.title}</h3>
+                    <h3 className="text-lg font-semibold">
+                      {session.name || session.exam?.title}
+                    </h3>
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(session.status)}`}>
                       {session.status}
                     </span>
+                    {session.isArchived && (
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-200 text-gray-700">
+                        Archived
+                      </span>
+                    )}
                   </div>
+
+                  <p className="text-sm text-gray-600 mb-3">
+                    <span className="font-medium">Exam:</span> {session.exam?.title}
+                  </p>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
                     <div>
                       <p className="text-sm text-gray-600">
-                        <span className="font-medium">Examiner:</span>{' '}
+                        <span className="font-medium">Primary Examiner:</span>{' '}
                         {session.examiner?.firstName} {session.examiner?.lastName}
                         <span className="text-gray-500 ml-1">({session.examiner?.email})</span>
                       </p>
-                      <p className="text-sm text-gray-600 mt-1">
+
+                      {session.examiners && session.examiners.length > 1 && (
+                        <div className="mt-2">
+                          <p className="text-sm font-medium text-gray-700">All Examiners:</p>
+                          <ul className="text-sm text-gray-600 ml-4 list-disc">
+                            {session.examiners.map(examiner => (
+                              <li key={examiner._id}>
+                                {examiner.firstName} {examiner.lastName}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+
+                      <p className="text-sm text-gray-600 mt-2">
                         <span className="font-medium">Duration:</span> {session.exam?.duration} minutes
                       </p>
                       <p className="text-sm text-gray-600 mt-1">
@@ -209,6 +471,9 @@ export default function SessionManager() {
 
                     <div>
                       <p className="text-sm text-gray-600">
+                        <span className="font-medium">Assigned Students:</span> {session.assignedStudents?.length || 0}
+                      </p>
+                      <p className="text-sm text-gray-600 mt-1">
                         <span className="font-medium">Participants:</span> {session.participants?.length || 0}
                       </p>
                       <p className="text-sm text-gray-600 mt-1">
@@ -222,30 +487,39 @@ export default function SessionManager() {
                     </div>
                   </div>
 
-                  {/* Reassign Examiner Section */}
-                  {session.status === 'scheduled' && (
-                    <div className="mt-4 p-4 bg-gray-50 rounded">
-                      <p className="text-sm font-medium text-gray-700 mb-2">Reassign Examiner</p>
-                      <div className="flex gap-2">
-                        <select
-                          value={reassignData.sessionId === session._id ? reassignData.examinerId : ''}
-                          onChange={(e) => setReassignData({ sessionId: session._id, examinerId: e.target.value })}
-                          className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                        >
-                          <option value="">-- Select new examiner --</option>
-                          {examiners.map(examiner => (
-                            <option key={examiner._id} value={examiner._id}>
-                              {examiner.firstName} {examiner.lastName}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          onClick={() => handleReassign(session._id)}
-                          disabled={reassignData.sessionId !== session._id || !reassignData.examinerId}
-                          className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                        >
-                          Reassign
-                        </button>
+                  {/* Examiner-Student Pairs */}
+                  {session.examinerStudentPairs && session.examinerStudentPairs.length > 0 && (
+                    <div className="mt-4 p-4 bg-blue-50 rounded">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Examiner-Student Pairings:</p>
+                      <div className="space-y-1">
+                        {session.examinerStudentPairs.map((pair, index) => (
+                          <div key={index} className="text-sm text-gray-700">
+                            <span className="font-medium">
+                              {pair.examiner?.firstName} {pair.examiner?.lastName}
+                            </span>
+                            {' → '}
+                            <span>
+                              {pair.student?.firstName} {pair.student?.lastName}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Assigned Students List */}
+                  {session.assignedStudents && session.assignedStudents.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Assigned Students:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {session.assignedStudents.map((student) => (
+                          <span
+                            key={student._id}
+                            className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded"
+                          >
+                            {student.firstName} {student.lastName}
+                          </span>
+                        ))}
                       </div>
                     </div>
                   )}
@@ -269,12 +543,40 @@ export default function SessionManager() {
                   )}
                 </div>
 
-                <button
-                  onClick={() => deleteSession(session._id)}
-                  className="ml-4 px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
-                >
-                  Delete
-                </button>
+                <div className="ml-4 flex flex-col gap-2">
+                  {!session.isArchived && session.status === 'scheduled' && (
+                    <button
+                      onClick={() => handleEdit(session)}
+                      className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                    >
+                      Edit
+                    </button>
+                  )}
+
+                  {session.isArchived ? (
+                    <button
+                      onClick={() => unarchiveSession(session._id)}
+                      className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
+                    >
+                      Unarchive
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => archiveSession(session._id)}
+                        className="px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 text-sm"
+                      >
+                        Archive
+                      </button>
+                      <button
+                        onClick={() => deleteOrArchiveSession(session)}
+                        className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm"
+                      >
+                        Delete
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           ))

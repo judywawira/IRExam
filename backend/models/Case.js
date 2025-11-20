@@ -17,6 +17,16 @@ const caseSchema = new mongoose.Schema({
       type: String,
       default: ''
     },
+    discussionPoints: [{
+      point: {
+        type: String,
+        required: true
+      },
+      order: {
+        type: Number,
+        default: 0
+      }
+    }],
     uploadedAt: {
       type: Date,
       default: Date.now
