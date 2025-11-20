@@ -3,12 +3,25 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { io } from 'socket.io-client'
 import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
+import * as cornerstone from 'cornerstone-core'
+import * as cornerstoneWADOImageLoader from 'cornerstone-wado-image-loader'
+import dicomParser from 'dicom-parser'
+
+// Initialize Cornerstone DICOM loader
+cornerstoneWADOImageLoader.external.cornerstone = cornerstone
+cornerstoneWADOImageLoader.external.dicomParser = dicomParser
+cornerstoneWADOImageLoader.configure({
+  beforeSend: function(xhr) {
+    // Add custom headers if needed
+  }
+})
 
 export default function ExamSession() {
   const { sessionId } = useParams()
   const { user, token } = useAuth()
   const navigate = useNavigate()
   const socketRef = useRef(null)
+  const dicomElementRef = useRef(null)
 
   const [session, setSession] = useState(null)
   const [currentCase, setCurrentCase] = useState(null)
@@ -51,6 +64,33 @@ export default function ExamSession() {
     }
     return () => clearInterval(interval)
   }, [isRunning, timeRemaining, isExaminer, sessionId])
+
+  // Load DICOM image when currentImage changes
+  useEffect(() => {
+    if (currentImage && dicomElementRef.current) {
+      loadDicomImage()
+    }
+  }, [currentImage])
+
+  const loadDicomImage = async () => {
+    if (!currentImage || !dicomElementRef.current) return
+
+    const isDicom = currentImage.path.toLowerCase().endsWith('.dcm') ||
+                    currentImage.path.toLowerCase().includes('.dicom')
+
+    if (isDicom) {
+      try {
+        const element = dicomElementRef.current
+        cornerstone.enable(element)
+
+        const imageId = `wadouri:http://localhost:5000/${currentImage.path}`
+        const image = await cornerstone.loadImage(imageId)
+        cornerstone.displayImage(element, image)
+      } catch (error) {
+        console.error('Error loading DICOM image:', error)
+      }
+    }
+  }
 
   const fetchSession = async () => {
     try {
@@ -136,7 +176,7 @@ export default function ExamSession() {
             updateCurrentDisplay(session.exam, caseIndex, imageIndex)
           }
           setShowTransition(false)
-          setViewMode(imageIndex === 0 && caseIndex > 0 ? 'history' : 'image')
+          setViewMode(imageIndex === 0 ? 'history' : 'image')
         }, 2000)
       } else {
         setCurrentCaseIndex(caseIndex)
@@ -235,6 +275,11 @@ export default function ExamSession() {
     return `${mins}:${secs.toString().padStart(2, '0')}`
   }
 
+  const isDicomFile = (imagePath) => {
+    if (!imagePath) return false
+    return imagePath.toLowerCase().endsWith('.dcm') || imagePath.toLowerCase().includes('.dicom')
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
@@ -325,26 +370,12 @@ export default function ExamSession() {
 
           {status !== 'scheduled' && viewMode === 'image' && currentImage && (
             <div className="w-full max-w-6xl">
-              {currentImage.path.toLowerCase().endsWith('.dcm') || currentImage.path.toLowerCase().includes('.dicom') ? (
-                <div className="text-center p-12 bg-gray-800 rounded-lg">
-                  <svg className="w-32 h-32 mx-auto mb-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  <h3 className="text-2xl font-bold text-white mb-4">DICOM Medical Image</h3>
-                  <p className="text-gray-400 mb-6">
-                    This is a DICOM format medical image. DICOM files require specialized viewing software.
-                  </p>
-                  <a
-                    href={`/${currentImage.path}`}
-                    download={currentImage.originalName}
-                    className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                  >
-                    Download DICOM File
-                  </a>
-                  <p className="text-sm text-gray-500 mt-4">
-                    File: {currentImage.originalName}
-                  </p>
-                </div>
+              {isDicomFile(currentImage.path) ? (
+                <div
+                  ref={dicomElementRef}
+                  className="w-full h-[80vh] bg-black rounded-lg"
+                  style={{ minHeight: '600px' }}
+                />
               ) : (
                 <img
                   src={`/${currentImage.path}`}
@@ -430,35 +461,24 @@ export default function ExamSession() {
               <div className="flex-1 flex flex-col items-center justify-center bg-black rounded-lg p-6">
                 {currentImage ? (
                   <div className="w-full">
-                    {currentImage.path.toLowerCase().endsWith('.dcm') || currentImage.path.toLowerCase().includes('.dicom') ? (
-                      <div className="text-center p-12 bg-gray-800 rounded-lg">
-                        <svg className="w-32 h-32 mx-auto mb-6 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <h3 className="text-2xl font-bold text-white mb-4">DICOM Medical Image</h3>
-                        <p className="text-gray-400 mb-6">
-                          This is a DICOM format medical image. DICOM files require specialized viewing software.
-                        </p>
-                        <a
-                          href={`/${currentImage.path}`}
-                          download={currentImage.originalName}
-                          className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                        >
-                          Download DICOM File
-                        </a>
-                        <p className="text-sm text-gray-500 mt-4">
-                          File: {currentImage.originalName}
-                        </p>
-                        {currentImage.description && (
-                          <p className="mt-4 text-gray-400 text-sm italic">
-                            Note: {currentImage.description}
-                          </p>
-                        )}
-                        <div className="text-center mt-6">
-                          <p className="text-gray-400 text-sm">
+                    {isDicomFile(currentImage.path) ? (
+                      <div>
+                        <div
+                          ref={dicomElementRef}
+                          className="w-full h-[60vh] bg-black rounded-lg"
+                          style={{ minHeight: '500px' }}
+                        />
+                        <div className="text-center mt-4">
+                          <p className="text-gray-400">
                             Case {currentCaseIndex + 1} / {session.exam.cases.length} -
                             Image {currentImageIndex + 1} / {currentCase?.images.length}
                           </p>
+                          <p className="text-sm text-blue-400 mt-2">DICOM Image</p>
+                          {currentImage.description && (
+                            <p className="mt-2 text-gray-500 text-sm italic">
+                              {currentImage.description}
+                            </p>
+                          )}
                         </div>
                       </div>
                     ) : (
@@ -492,7 +512,7 @@ export default function ExamSession() {
           )}
 
           {/* Thumbnails for Examiners */}
-          {currentCase && (
+          {isExaminer && currentCase && (
             <div className="bg-gray-800 rounded-lg p-6 mt-4">
               <h4 className="text-sm font-semibold mb-4 text-gray-300">
                 Case {currentCaseIndex + 1} - Click to navigate
@@ -531,15 +551,28 @@ export default function ExamSession() {
                     }`}
                     title={`Image ${idx + 1}${img.description ? ': ' + img.description : ''}`}
                   >
-                    <img
-                      src={`/${img.path}`}
-                      alt={`Image ${idx + 1}`}
-                      className="w-full h-full object-cover"
-                    />
+                    {isDicomFile(img.path) ? (
+                      <div className="w-full h-full bg-gray-700 flex items-center justify-center">
+                        <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                    ) : (
+                      <img
+                        src={`/${img.path}`}
+                        alt={`Image ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                     <span className="absolute bottom-1 right-1 bg-black/90 text-white text-xs px-2 py-1 rounded font-semibold">
                       {idx + 1}
                     </span>
+                    {isDicomFile(img.path) && (
+                      <span className="absolute top-1 left-1 bg-blue-600 text-white text-xs px-2 py-1 rounded font-semibold">
+                        DCM
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>

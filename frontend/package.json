@@ -3,14 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@headlessui/react": "^1.7.17",
+    "@heroicons/react": "^2.1.1",
+    "axios": "^1.6.2",
+    "cornerstone-core": "^2.6.1",
+    "cornerstone-wado-image-loader": "^4.13.2",
+    "dicom-parser": "^1.8.21",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.0",
-    "axios": "^1.6.2",
-    "socket.io-client": "^4.6.0",
     "react-dropzone": "^14.2.3",
-    "@headlessui/react": "^1.7.17",
-    "@heroicons/react": "^2.1.1"
+    "react-router-dom": "^6.20.0",
+    "socket.io-client": "^4.6.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.1",
