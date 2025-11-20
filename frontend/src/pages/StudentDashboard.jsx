@@ -50,7 +50,7 @@ export default function StudentDashboard() {
       <div className="flex items-center justify-center min-h-screen bg-gray-100">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading your exams...</p>
+          <p className="mt-4 text-gray-600">Loading your sessions...</p>
         </div>
       </div>
     )
@@ -62,7 +62,7 @@ export default function StudentDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <h1 className="text-xl font-bold text-gray-900">My Exams</h1>
+              <h1 className="text-xl font-bold text-gray-900">My Exam Sessions</h1>
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-700">
@@ -95,9 +95,9 @@ export default function StudentDashboard() {
                 d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
               />
             </svg>
-            <h3 className="mt-4 text-lg font-medium text-gray-900">No Exams Scheduled</h3>
+            <h3 className="mt-4 text-lg font-medium text-gray-900">No Sessions Available</h3>
             <p className="mt-2 text-gray-500">
-              You don't have any exams scheduled at the moment.
+              You don't have any exam sessions scheduled at the moment.
               <br />
               Check back later or contact your examiner.
             </p>
@@ -122,7 +122,7 @@ export default function StudentDashboard() {
                           <div className="h-3 w-3 bg-green-500 rounded-full animate-pulse"></div>
                         </div>
                         <p className="text-green-800 font-medium">
-                          Your exam is currently in progress
+                          Your session is currently in progress
                         </p>
                       </div>
                     )}
@@ -130,16 +130,19 @@ export default function StudentDashboard() {
                     {isScheduled && (
                       <div className="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg">
                         <p className="text-blue-800 font-medium">
-                          Your exam is about to begin. Please join when ready.
+                          Your session is about to begin. Please join when ready.
                         </p>
                       </div>
                     )}
 
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
-                        <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                          {session.exam.title}
+                        <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                          {session.name}
                         </h3>
+                        <p className="text-gray-600 mb-4">
+                          Exam: {session.exam.title}
+                        </p>
 
                         <div className="grid grid-cols-2 gap-4 mb-4">
                           <div className="flex items-center gap-2">
