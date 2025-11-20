@@ -234,8 +234,13 @@ export default function ExamSession() {
 
     setCurrentCase(caseData)
 
-    if (caseData.images && caseData.images[imageIndex]) {
-      setCurrentImage(caseData.images[imageIndex])
+    // imageIndex 0 is reserved for history view
+    // Actual images start at index 1
+    if (imageIndex > 0 && caseData.images && caseData.images[imageIndex - 1]) {
+      setCurrentImage(caseData.images[imageIndex - 1])
+    } else if (imageIndex === 0) {
+      // History view - no image to set
+      setCurrentImage(null)
     } else {
       console.error('updateCurrentDisplay: image not found', {
         imageIndex,
@@ -285,7 +290,10 @@ export default function ExamSession() {
   const nextImage = () => {
     if (!session?.exam?.cases || !currentCase) return
 
-    if (currentImageIndex < currentCase.images.length - 1) {
+    // imageIndex 0 = history, images start at index 1
+    const maxImageIndex = currentCase.images.length // last image is at length (since 0 is history)
+
+    if (currentImageIndex < maxImageIndex) {
       navigateToImage(currentCaseIndex, currentImageIndex + 1)
     } else if (currentCaseIndex < session.exam.cases.length - 1) {
       navigateToImage(currentCaseIndex + 1, 0)
@@ -299,7 +307,8 @@ export default function ExamSession() {
       navigateToImage(currentCaseIndex, currentImageIndex - 1)
     } else if (currentCaseIndex > 0) {
       const prevCase = session.exam.cases[currentCaseIndex - 1]
-      navigateToImage(currentCaseIndex - 1, prevCase.images.length - 1)
+      // Navigate to last image of previous case (length, not length-1, since 0 is history)
+      navigateToImage(currentCaseIndex - 1, prevCase.images.length)
     }
   }
 
@@ -505,7 +514,7 @@ export default function ExamSession() {
                         <div className="text-center mt-4">
                           <p className="text-gray-400">
                             Case {currentCaseIndex + 1} / {session.exam.cases.length} -
-                            Image {currentImageIndex + 1} / {currentCase?.images.length}
+                            Image {currentImageIndex} / {currentCase?.images.length}
                           </p>
                           <p className="text-sm text-blue-400 mt-2">DICOM Image</p>
                           {currentImage.description && (
@@ -525,7 +534,7 @@ export default function ExamSession() {
                         <div className="text-center mt-4">
                           <p className="text-gray-400">
                             Case {currentCaseIndex + 1} / {session.exam.cases.length} -
-                            Image {currentImageIndex + 1} / {currentCase?.images.length}
+                            Image {currentImageIndex} / {currentCase?.images.length}
                           </p>
                           {currentImage.description && (
                             <p className="mt-2 text-gray-500 text-sm italic">
@@ -577,9 +586,9 @@ export default function ExamSession() {
                 {currentCase.images.map((img, idx) => (
                   <button
                     key={idx}
-                    onClick={() => navigateToImage(currentCaseIndex, idx)}
+                    onClick={() => navigateToImage(currentCaseIndex, idx + 1)}
                     className={`relative aspect-square rounded-lg overflow-hidden transition-all transform hover:scale-105 ${
-                      viewMode === 'image' && currentImageIndex === idx
+                      viewMode === 'image' && currentImageIndex === idx + 1
                         ? 'ring-4 ring-blue-500 shadow-lg shadow-blue-500/50'
                         : 'ring-1 ring-gray-600 hover:ring-2 hover:ring-gray-400'
                     }`}
