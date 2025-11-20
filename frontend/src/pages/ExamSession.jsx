@@ -226,29 +226,40 @@ export default function ExamSession() {
 
     socketRef.current.on('exam-started', (data) => {
       setStatus('active')
+      if (!isExaminer) {
+        alert(`Exam session for ${user.firstName} ${user.lastName} has started.`)
+      }
     })
 
     socketRef.current.on('exam-paused', () => {
       setStatus('paused')
       if (!isExaminer) {
-        alert('Exam has been paused by the examiner.')
+        alert(`Exam session for ${user.firstName} ${user.lastName} has been paused by the examiner.`)
       }
     })
 
     socketRef.current.on('exam-resumed', () => {
       setStatus('active')
       if (!isExaminer) {
-        alert('Exam has been resumed.')
+        alert(`Exam session for ${user.firstName} ${user.lastName} has been resumed.`)
       }
     })
 
     socketRef.current.on('exam-ended', () => {
       setStatus('completed')
       if (!isExaminer) {
-        alert('Exam has ended. Returning to dashboard...')
+        alert(`Exam session for ${user.firstName} ${user.lastName} has been completed. Returning to dashboard...`)
         setTimeout(() => navigate('/'), 1500)
       } else {
-        alert('Exam has ended.')
+        // For examiner, show which student's session was completed
+        const pairedStudent = session?.examinerStudentPairs?.find(
+          pair => pair.examiner?._id === user._id
+        )?.student
+        if (pairedStudent) {
+          alert(`Exam session for ${pairedStudent.firstName} ${pairedStudent.lastName} has been completed.`)
+        } else {
+          alert('Exam has ended.')
+        }
       }
     })
 
@@ -325,7 +336,23 @@ export default function ExamSession() {
   }
 
   const handleStart = () => {
-    socketRef.current.emit('start-exam', sessionId)
+    // Get the student name for confirmation
+    const pairedStudent = session?.examinerStudentPairs?.find(
+      pair => pair.examiner?._id === user._id
+    )?.student
+
+    const studentName = pairedStudent
+      ? `${pairedStudent.firstName} ${pairedStudent.lastName}`
+      : session?.assignedStudents?.map(s => `${s.firstName} ${s.lastName}`).join(', ')
+
+    if (studentName) {
+      const confirmStart = confirm(`Start exam session for ${studentName}?`)
+      if (confirmStart) {
+        socketRef.current.emit('start-exam', sessionId)
+      }
+    } else {
+      socketRef.current.emit('start-exam', sessionId)
+    }
   }
 
   const handlePause = () => {
@@ -337,7 +364,20 @@ export default function ExamSession() {
   }
 
   const handleEnd = () => {
-    if (confirm('Are you sure you want to end this exam?')) {
+    // Get the student name for confirmation
+    const pairedStudent = session?.examinerStudentPairs?.find(
+      pair => pair.examiner?._id === user._id
+    )?.student
+
+    const studentName = pairedStudent
+      ? `${pairedStudent.firstName} ${pairedStudent.lastName}`
+      : session?.assignedStudents?.map(s => `${s.firstName} ${s.lastName}`).join(', ')
+
+    const confirmMessage = studentName
+      ? `Are you sure you want to end the exam session for ${studentName}?`
+      : 'Are you sure you want to end this exam?'
+
+    if (confirm(confirmMessage)) {
       socketRef.current.emit('end-exam', sessionId)
     }
   }
@@ -430,6 +470,15 @@ export default function ExamSession() {
                 {status === 'paused' && 'Exam Paused'}
                 {status === 'completed' && 'Exam Completed'}
               </p>
+              {/* Display Student Name */}
+              <div className="mt-2">
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-600 text-white">
+                  <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                  Session for: {user.firstName} {user.lastName}
+                </span>
+              </div>
             </div>
             <div className="flex items-center gap-4">
               <div className="text-2xl font-mono font-bold">
@@ -523,6 +572,39 @@ export default function ExamSession() {
             <p className="text-sm text-gray-400">
               Examiner View - {status === 'scheduled' ? 'Not Started' : status === 'active' ? 'In Progress' : status === 'paused' ? 'Paused' : 'Completed'}
             </p>
+            {/* Display Current Student */}
+            {(() => {
+              // Check if there's a 1:1 pairing for this examiner
+              const pairedStudent = session.examinerStudentPairs?.find(
+                pair => pair.examiner?._id === user._id
+              )?.student
+
+              if (pairedStudent) {
+                return (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold bg-blue-600 text-white">
+                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      Session for: {pairedStudent.firstName} {pairedStudent.lastName}
+                    </span>
+                  </div>
+                )
+              } else if (session.assignedStudents && session.assignedStudents.length > 0) {
+                // Show all assigned students if no specific pairing
+                return (
+                  <div className="mt-2 flex items-center gap-2 flex-wrap">
+                    <span className="text-sm text-gray-400">Students:</span>
+                    {session.assignedStudents.map((student, i) => (
+                      <span key={i} className="inline-flex items-center px-2 py-1 rounded text-xs font-semibold bg-gray-700 text-gray-200">
+                        {student.firstName} {student.lastName}
+                      </span>
+                    ))}
+                  </div>
+                )
+              }
+              return null
+            })()}
           </div>
           <div className="flex items-center gap-4">
             <div className="text-2xl font-mono font-bold">
