@@ -24,14 +24,23 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = /jpeg|jpg|png|gif|dicom|dcm/;
-  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = allowedTypes.test(file.mimetype) || file.mimetype === 'application/dicom';
+  // Accept images and DICOM files
+  const imageTypes = /jpeg|jpg|png|gif/;
+  const dicomTypes = /dcm|dicom/;
+  const extname = path.extname(file.originalname).toLowerCase();
 
-  if (extname && mimetype) {
+  // Check if it's an image
+  const isImage = imageTypes.test(extname.slice(1));
+  const isDicom = dicomTypes.test(extname.slice(1));
+
+  // Also check MIME type
+  const isImageMime = file.mimetype.startsWith('image/');
+  const isDicomMime = file.mimetype === 'application/dicom' || extname === '.dcm';
+
+  if ((isImage && isImageMime) || isDicom || isDicomMime) {
     cb(null, true);
   } else {
-    cb(new Error('Only image files are allowed'));
+    cb(new Error(`Only image files (JPEG, PNG, GIF) and DICOM files (.dcm) are allowed. Received: ${file.originalname} with type: ${file.mimetype}`));
   }
 };
 
