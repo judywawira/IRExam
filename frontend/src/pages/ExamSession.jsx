@@ -165,16 +165,26 @@ export default function ExamSession() {
 
     socketRef.current.on('exam-paused', () => {
       setStatus('paused')
+      if (!isExaminer) {
+        alert('Exam has been paused by the examiner.')
+      }
     })
 
     socketRef.current.on('exam-resumed', () => {
       setStatus('active')
+      if (!isExaminer) {
+        alert('Exam has been resumed.')
+      }
     })
 
     socketRef.current.on('exam-ended', () => {
       setStatus('completed')
-      alert('Exam has ended. Returning to dashboard...')
-      setTimeout(() => navigate('/'), 1500)
+      if (!isExaminer) {
+        alert('Exam has ended. Returning to dashboard...')
+        setTimeout(() => navigate('/'), 1500)
+      } else {
+        alert('Exam has ended.')
+      }
     })
 
     socketRef.current.on('image-changed', ({ caseIndex, imageIndex }) => {
@@ -270,7 +280,9 @@ export default function ExamSession() {
   const navigateToImage = (caseIndex, imageIndex) => {
     if (!session?.exam?.cases) return
     const caseData = session.exam.cases[caseIndex]
-    if (!caseData || !caseData.images[imageIndex]) return
+    if (!caseData) return
+    // imageIndex 0 is history view, images start at index 1
+    if (imageIndex > 0 && !caseData.images[imageIndex - 1]) return
 
     // Emit socket event - will be broadcast to all participants including this examiner
     socketRef.current.emit('navigate-image', {
@@ -358,12 +370,14 @@ export default function ExamSession() {
               <div className="text-2xl font-mono font-bold">
                 {formatTime(timeRemaining)}
               </div>
-              <button
-                onClick={() => navigate('/')}
-                className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600"
-              >
-                Exit
-              </button>
+              {status === 'completed' && (
+                <button
+                  onClick={() => navigate('/')}
+                  className="px-4 py-2 bg-gray-700 rounded hover:bg-gray-600"
+                >
+                  Exit
+                </button>
+              )}
             </div>
           </div>
         </div>
