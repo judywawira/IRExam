@@ -18,7 +18,8 @@ const io = socketIO(server, {
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' })); // Increased limit for large JSON payloads
+app.use(express.urlencoded({ extended: true, limit: '50mb' })); // For form data
 app.use('/uploads', express.static('uploads'));
 
 // MongoDB Connection
