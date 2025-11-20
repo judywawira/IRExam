@@ -50,8 +50,8 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 } // 50MB limit
 });
 
-// Create new case
-router.post('/', authenticate, authorize('admin'), upload.array('images', 10), async (req, res) => {
+// Create new case - Allow both admins and examiners
+router.post('/', authenticate, authorize('admin', 'examiner'), upload.array('images', 10), async (req, res) => {
   try {
     const { title, clinicalHistory, discussionPoints } = req.body;
 
@@ -98,10 +98,17 @@ router.post('/', authenticate, authorize('admin'), upload.array('images', 10), a
   }
 });
 
-// Get all cases
+// Get all cases - Admins see all, examiners see only their own
 router.get('/', authenticate, async (req, res) => {
   try {
-    const cases = await Case.find()
+    let query = {};
+
+    // If user is an examiner (not admin), only show their own cases
+    if (req.userRole === 'examiner') {
+      query.createdBy = req.userId;
+    }
+
+    const cases = await Case.find(query)
       .populate('createdBy', 'firstName lastName email')
       .sort({ createdAt: -1 });
 
@@ -129,14 +136,19 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
-// Update case
-router.put('/:id', authenticate, authorize('admin'), upload.array('newImages', 10), async (req, res) => {
+// Update case - Admins can edit all, examiners can edit only their own
+router.put('/:id', authenticate, authorize('admin', 'examiner'), upload.array('newImages', 10), async (req, res) => {
   try {
     const { title, clinicalHistory, discussionPoints, imageDescriptions } = req.body;
     const caseItem = await Case.findById(req.params.id);
 
     if (!caseItem) {
       return res.status(404).json({ message: 'Case not found' });
+    }
+
+    // Check if examiner is trying to edit someone else's case
+    if (req.userRole === 'examiner' && caseItem.createdBy.toString() !== req.userId) {
+      return res.status(403).json({ message: 'You can only edit cases you created' });
     }
 
     if (title) caseItem.title = title;
@@ -197,13 +209,18 @@ router.put('/:id', authenticate, authorize('admin'), upload.array('newImages', 1
   }
 });
 
-// Delete case
-router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
+// Delete case - Admins can delete all, examiners can delete only their own
+router.delete('/:id', authenticate, authorize('admin', 'examiner'), async (req, res) => {
   try {
     const caseItem = await Case.findById(req.params.id);
 
     if (!caseItem) {
       return res.status(404).json({ message: 'Case not found' });
+    }
+
+    // Check if examiner is trying to delete someone else's case
+    if (req.userRole === 'examiner' && caseItem.createdBy.toString() !== req.userId) {
+      return res.status(403).json({ message: 'You can only delete cases you created' });
     }
 
     // Delete associated images
@@ -222,13 +239,18 @@ router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
   }
 });
 
-// Delete specific image from case
-router.delete('/:id/images/:imageId', authenticate, authorize('admin'), async (req, res) => {
+// Delete specific image from case - Admins can delete all, examiners can delete only from their own cases
+router.delete('/:id/images/:imageId', authenticate, authorize('admin', 'examiner'), async (req, res) => {
   try {
     const caseItem = await Case.findById(req.params.id);
 
     if (!caseItem) {
       return res.status(404).json({ message: 'Case not found' });
+    }
+
+    // Check if examiner is trying to delete image from someone else's case
+    if (req.userRole === 'examiner' && caseItem.createdBy.toString() !== req.userId) {
+      return res.status(403).json({ message: 'You can only delete images from cases you created' });
     }
 
     const imageIndex = caseItem.images.findIndex(

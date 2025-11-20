@@ -2,11 +2,13 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { useAuth } from '../context/AuthContext'
+import ExaminerCaseManager from '../components/examiner/ExaminerCaseManager'
 
 export default function ExaminerDashboard() {
   const { user, logout } = useAuth()
   const [sessions, setSessions] = useState([])
   const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('sessions')
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -68,13 +70,43 @@ export default function ExaminerDashboard() {
       </nav>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="bg-white shadow rounded-lg p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-semibold">Your Assigned Exam Sessions</h2>
-            <div className="text-sm text-gray-500">
-              Sessions are created and assigned by administrators
-            </div>
+        {/* Tabs */}
+        <div className="mb-6">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('sessions')}
+                className={`${
+                  activeTab === 'sessions'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                Exam Sessions
+              </button>
+              <button
+                onClick={() => setActiveTab('cases')}
+                className={`${
+                  activeTab === 'cases'
+                    ? 'border-indigo-500 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+              >
+                My Cases
+              </button>
+            </nav>
           </div>
+        </div>
+
+        {/* Sessions Tab */}
+        {activeTab === 'sessions' && (
+          <div className="bg-white shadow rounded-lg p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-lg font-semibold">Your Assigned Exam Sessions</h2>
+              <div className="text-sm text-gray-500">
+                Sessions are created and assigned by administrators
+              </div>
+            </div>
 
           {sessions.length === 0 ? (
             <div className="text-center py-12">
@@ -181,7 +213,15 @@ export default function ExaminerDashboard() {
               ))}
             </div>
           )}
-        </div>
+          </div>
+        )}
+
+        {/* Cases Tab */}
+        {activeTab === 'cases' && (
+          <div className="bg-white shadow rounded-lg p-6">
+            <ExaminerCaseManager />
+          </div>
+        )}
       </div>
     </div>
   )
