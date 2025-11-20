@@ -264,14 +264,16 @@ export default function ExamSession() {
             <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-blue-900 to-gray-900 rounded-lg p-12">
               <div className="max-w-4xl w-full">
                 <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-                  <div className="mb-6">
-                    <h2 className="text-3xl font-bold text-blue-300 mb-2">
-                      Case {currentCaseIndex + 1}
-                    </h2>
-                    <h3 className="text-2xl font-semibold text-white">
-                      {currentCase.title}
-                    </h3>
-                  </div>
+                  {isExaminer && (
+                    <div className="mb-6">
+                      <h2 className="text-3xl font-bold text-blue-300 mb-2">
+                        Case {currentCaseIndex + 1}
+                      </h2>
+                      <h3 className="text-2xl font-semibold text-white">
+                        {currentCase.title}
+                      </h3>
+                    </div>
+                  )}
                   <div className="bg-white/5 rounded-xl p-6 border border-white/10">
                     <h4 className="text-lg font-semibold text-blue-400 mb-4">Clinical History</h4>
                     <p className="text-gray-200 text-lg leading-relaxed whitespace-pre-wrap">
@@ -293,8 +295,8 @@ export default function ExamSession() {
           {/* Image Display View */}
           {viewMode === 'image' && (
             <div className="flex-1 flex flex-col">
-              {/* Case Title */}
-              {currentCase && (
+              {/* Case Title - Examiner Only */}
+              {isExaminer && currentCase && (
                 <div className="bg-gray-800 rounded-lg p-4 mb-4">
                   <h3 className="text-lg font-semibold text-blue-400">
                     Case {currentCaseIndex + 1}: {currentCase.title}
@@ -312,11 +314,17 @@ export default function ExamSession() {
                       className="w-full h-auto max-h-[60vh] object-contain rounded-lg shadow-lg mx-auto"
                     />
                     <div className="text-center mt-4">
-                      <p className="text-gray-400">
-                        Case {currentCaseIndex + 1} / {session.exam.cases.length} -
-                        Image {currentImageIndex + 1} / {currentCase?.images.length}
-                      </p>
-                      {currentImage.description && (
+                      {isExaminer ? (
+                        <p className="text-gray-400">
+                          Case {currentCaseIndex + 1} / {session.exam.cases.length} -
+                          Image {currentImageIndex + 1} / {currentCase?.images.length}
+                        </p>
+                      ) : (
+                        <p className="text-gray-400">
+                          Image {currentImageIndex + 1} / {currentCase?.images.length}
+                        </p>
+                      )}
+                      {isExaminer && currentImage.description && (
                         <p className="mt-2 text-gray-500 text-sm italic">
                           {currentImage.description}
                         </p>

@@ -102,6 +102,37 @@ router.put('/:id', authenticate, authorize('admin'), async (req, res) => {
   }
 });
 
+// Clone exam
+router.post('/:id/clone', authenticate, authorize('admin'), async (req, res) => {
+  try {
+    const exam = await Exam.findById(req.params.id).populate('cases');
+
+    if (!exam) {
+      return res.status(404).json({ message: 'Exam not found' });
+    }
+
+    // Create a new exam with the same data but new title
+    const clonedExam = new Exam({
+      title: `${exam.title} (Copy)`,
+      description: exam.description,
+      cases: exam.cases.map(c => c._id), // Copy case IDs
+      duration: exam.duration,
+      createdBy: req.userId
+    });
+
+    await clonedExam.save();
+    await clonedExam.populate('cases');
+
+    res.status(201).json({
+      message: 'Exam cloned successfully',
+      exam: clonedExam
+    });
+  } catch (error) {
+    console.error('Clone exam error:', error);
+    res.status(500).json({ message: 'Server error while cloning exam' });
+  }
+});
+
 // Delete exam
 router.delete('/:id', authenticate, authorize('admin'), async (req, res) => {
   try {

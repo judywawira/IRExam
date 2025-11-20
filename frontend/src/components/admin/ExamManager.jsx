@@ -72,9 +72,24 @@ export default function ExamManager() {
     try {
       await axios.delete(`/api/exams/${examId}`)
       setExams(exams.filter(e => e._id !== examId))
+      alert('Exam deleted successfully')
     } catch (error) {
       console.error('Error deleting exam:', error)
       alert('Failed to delete exam')
+    }
+  }
+
+  const cloneExam = async (examId) => {
+    if (!confirm('Clone this exam? A copy will be created with the same cases and settings.')) return
+
+    try {
+      const response = await axios.post(`/api/exams/${examId}/clone`)
+      setExams([response.data.exam, ...exams])
+      alert('Exam cloned successfully')
+      fetchData() // Refresh to get the latest data
+    } catch (error) {
+      console.error('Error cloning exam:', error)
+      alert('Failed to clone exam')
     }
   }
 
@@ -675,12 +690,18 @@ export default function ExamManager() {
                   </div>
                 </div>
 
-                <div className="ml-4 flex gap-2">
+                <div className="ml-4 flex flex-wrap gap-2">
                   <button
                     onClick={() => setPreviewExamId(exam._id)}
                     className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 text-sm"
                   >
                     Preview
+                  </button>
+                  <button
+                    onClick={() => cloneExam(exam._id)}
+                    className="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm"
+                  >
+                    Clone
                   </button>
                   <button
                     onClick={() => startEditExam(exam)}
