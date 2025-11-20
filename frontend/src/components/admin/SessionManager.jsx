@@ -85,6 +85,11 @@ export default function SessionManager() {
       return
     }
 
+    if (formData.assignedStudents.length === 0) {
+      alert('Please assign at least one student to the session')
+      return
+    }
+
     try {
       if (editingSession) {
         // Update existing session
@@ -345,7 +350,7 @@ export default function SessionManager() {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Assign Students (Optional)
+                Assign Students * (Required)
               </label>
               <div className="border border-gray-300 rounded-md p-3 max-h-40 overflow-y-auto">
                 {students.length === 0 ? (

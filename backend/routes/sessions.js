@@ -51,6 +51,11 @@ router.get('/', authenticate, async (req, res) => {
   try {
     let query = {};
 
+    // Students and examiners should never see archived sessions
+    if (req.user.role !== 'admin') {
+      query.isArchived = { $ne: true };
+    }
+
     // If user is examiner, show only their assigned sessions
     if (req.user.role === 'examiner') {
       query.examiner = req.userId;
@@ -94,6 +99,13 @@ router.get('/:id', authenticate, async (req, res) => {
       return res.status(404).json({ message: 'Session not found' });
     }
 
+    // Block students and examiners from accessing archived sessions
+    if (session.isArchived && req.user.role !== 'admin') {
+      return res.status(403).json({
+        message: 'This session has been archived and is no longer accessible. Please contact your administrator.'
+      });
+    }
+
     res.json({ session });
   } catch (error) {
     console.error('Get session error:', error);
@@ -108,6 +120,13 @@ router.post('/:id/join', authenticate, authorize('student'), async (req, res) =>
 
     if (!session) {
       return res.status(404).json({ message: 'Session not found' });
+    }
+
+    // Prevent joining archived sessions
+    if (session.isArchived) {
+      return res.status(403).json({
+        message: 'This session has been archived and is no longer accessible.'
+      });
     }
 
     if (session.status === 'completed') {
