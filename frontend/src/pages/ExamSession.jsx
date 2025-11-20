@@ -10,11 +10,6 @@ import dicomParser from 'dicom-parser'
 // Initialize Cornerstone DICOM loader
 cornerstoneWADOImageLoader.external.cornerstone = cornerstone
 cornerstoneWADOImageLoader.external.dicomParser = dicomParser
-cornerstoneWADOImageLoader.configure({
-  beforeSend: function(xhr) {
-    // Add custom headers if needed
-  }
-})
 
 export default function ExamSession() {
   const { sessionId } = useParams()
@@ -83,7 +78,8 @@ export default function ExamSession() {
         const element = dicomElementRef.current
         cornerstone.enable(element)
 
-        const imageId = `wadouri:http://localhost:5000/${currentImage.path}`
+        const baseUrl = import.meta.env.VITE_API_URL || window.location.origin
+        const imageId = `wadouri:${baseUrl}/${currentImage.path}`
         const image = await cornerstone.loadImage(imageId)
         cornerstone.displayImage(element, image)
       } catch (error) {
@@ -116,7 +112,8 @@ export default function ExamSession() {
   }
 
   const setupSocket = () => {
-    socketRef.current = io('http://localhost:5000', {
+    const socketUrl = import.meta.env.VITE_API_URL || window.location.origin
+    socketRef.current = io(socketUrl, {
       auth: { token }
     })
 
@@ -124,7 +121,6 @@ export default function ExamSession() {
 
     // Handle session state updates
     socketRef.current.on('session-state', (data) => {
-      console.log('Session state received:', data)
       setTimeRemaining(data.timeRemaining)
       setStatus(data.status)
       setCurrentCaseIndex(data.currentCaseIndex)
@@ -140,30 +136,24 @@ export default function ExamSession() {
     })
 
     socketRef.current.on('exam-started', (data) => {
-      console.log('Exam started event received')
       setStatus('active')
     })
 
     socketRef.current.on('exam-paused', () => {
-      console.log('Exam paused event received')
       setStatus('paused')
     })
 
     socketRef.current.on('exam-resumed', () => {
-      console.log('Exam resumed event received')
       setStatus('active')
     })
 
     socketRef.current.on('exam-ended', () => {
-      console.log('Exam ended event received')
       setStatus('completed')
       alert('Exam has ended. Returning to dashboard...')
       setTimeout(() => navigate('/'), 1500)
     })
 
     socketRef.current.on('image-changed', ({ caseIndex, imageIndex }) => {
-      console.log('Image changed event received:', caseIndex, imageIndex)
-
       // Show transition for students when changing cases
       if (caseIndex !== currentCaseIndex && !isExaminer) {
         setShowTransition(true)
@@ -205,29 +195,24 @@ export default function ExamSession() {
   }
 
   const handleStart = () => {
-    console.log('Starting exam...')
     socketRef.current.emit('start-exam', sessionId)
   }
 
   const handlePause = () => {
-    console.log('Pausing exam...')
     socketRef.current.emit('pause-exam', sessionId)
   }
 
   const handleResume = () => {
-    console.log('Resuming exam...')
     socketRef.current.emit('resume-exam', sessionId)
   }
 
   const handleEnd = () => {
     if (confirm('Are you sure you want to end this exam?')) {
-      console.log('Ending exam...')
       socketRef.current.emit('end-exam', sessionId)
     }
   }
 
   const navigateToImage = (caseIndex, imageIndex) => {
-    console.log('Navigating to:', caseIndex, imageIndex)
     if (!session?.exam?.cases) return
     const caseData = session.exam.cases[caseIndex]
     if (!caseData || !caseData.images[imageIndex]) return
@@ -241,7 +226,6 @@ export default function ExamSession() {
   }
 
   const showHistory = (caseIndex) => {
-    console.log('Showing history for case:', caseIndex)
     if (!session?.exam?.cases) return
 
     // Navigate to first "image" of the case which triggers history view
