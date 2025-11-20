@@ -78,7 +78,7 @@ export default function ExamSession() {
         const element = dicomElementRef.current
         cornerstone.enable(element)
 
-        const baseUrl = import.meta.env.VITE_API_URL || window.location.origin
+        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
         const imageId = `wadouri:${baseUrl}/${currentImage.path}`
         const image = await cornerstone.loadImage(imageId)
         cornerstone.displayImage(element, image)
@@ -112,7 +112,7 @@ export default function ExamSession() {
   }
 
   const setupSocket = () => {
-    const socketUrl = import.meta.env.VITE_API_URL || window.location.origin
+    const socketUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
     socketRef.current = io(socketUrl, {
       auth: { token }
     })
