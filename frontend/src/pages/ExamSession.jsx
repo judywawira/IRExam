@@ -11,6 +11,13 @@ import dicomParser from 'dicom-parser'
 cornerstoneWADOImageLoader.external.cornerstone = cornerstone
 cornerstoneWADOImageLoader.external.dicomParser = dicomParser
 
+// Configure WADO Image Loader
+cornerstoneWADOImageLoader.configure({
+  beforeSend: function(xhr) {
+    // Add custom headers if needed
+  }
+})
+
 export default function ExamSession() {
   const { sessionId } = useParams()
   const { user, token } = useAuth()
@@ -60,6 +67,13 @@ export default function ExamSession() {
     return () => clearInterval(interval)
   }, [isRunning, timeRemaining, isExaminer, sessionId])
 
+  // Update current display when case or image index changes
+  useEffect(() => {
+    if (session?.exam) {
+      updateCurrentDisplay(session.exam, currentCaseIndex, currentImageIndex)
+    }
+  }, [currentCaseIndex, currentImageIndex, session?.exam])
+
   // Load DICOM image when currentImage changes
   useEffect(() => {
     if (currentImage && dicomElementRef.current) {
@@ -78,12 +92,22 @@ export default function ExamSession() {
         const element = dicomElementRef.current
         cornerstone.enable(element)
 
-        const baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'
-        const imageId = `wadouri:${baseUrl}/${currentImage.path}`
+        // Construct the proper URL for DICOM image
+        const baseUrl = import.meta.env.VITE_API_URL || window.location.origin
+        // Remove leading slash if present to avoid double slashes
+        const imagePath = currentImage.path.startsWith('/') ? currentImage.path.slice(1) : currentImage.path
+        const imageId = `wadouri:${baseUrl}/${imagePath}`
+
+        console.log('Loading DICOM image:', imageId)
         const image = await cornerstone.loadImage(imageId)
         cornerstone.displayImage(element, image)
       } catch (error) {
         console.error('Error loading DICOM image:', error)
+        // Display error in the element
+        const element = dicomElementRef.current
+        if (element) {
+          element.innerHTML = `<div class="flex items-center justify-center h-full text-red-500"><div class="text-center"><p>Failed to load DICOM image</p><p class="text-sm mt-2">${error.message}</p></div></div>`
+        }
       }
     }
   }
@@ -154,28 +178,25 @@ export default function ExamSession() {
     })
 
     socketRef.current.on('image-changed', ({ caseIndex, imageIndex }) => {
-      // Show transition for students when changing cases
-      if (caseIndex !== currentCaseIndex && !isExaminer) {
-        setShowTransition(true)
-        setViewMode('transition')
-
-        setTimeout(() => {
-          setCurrentCaseIndex(caseIndex)
-          setCurrentImageIndex(imageIndex)
-          if (session?.exam) {
-            updateCurrentDisplay(session.exam, caseIndex, imageIndex)
-          }
-          setShowTransition(false)
-          setViewMode(imageIndex === 0 ? 'history' : 'image')
-        }, 2000)
-      } else {
-        setCurrentCaseIndex(caseIndex)
+      // Use functional state updates to avoid stale closure issues
+      setCurrentCaseIndex(prevCaseIndex => {
         setCurrentImageIndex(imageIndex)
-        if (session?.exam) {
-          updateCurrentDisplay(session.exam, caseIndex, imageIndex)
+
+        // Show transition for students when changing cases
+        if (caseIndex !== prevCaseIndex && !isExaminer) {
+          setShowTransition(true)
+          setViewMode('transition')
+
+          setTimeout(() => {
+            setShowTransition(false)
+            setViewMode(imageIndex === 0 ? 'history' : 'image')
+          }, 2000)
+        } else {
+          setViewMode(imageIndex === 0 ? 'history' : 'image')
         }
-        setViewMode(imageIndex === 0 ? 'history' : 'image')
-      }
+
+        return caseIndex
+      })
     })
 
     socketRef.current.on('timer-update', ({ timeRemaining }) => {
@@ -188,10 +209,39 @@ export default function ExamSession() {
   }
 
   const updateCurrentDisplay = (exam, caseIndex, imageIndex) => {
-    if (!exam || !exam.cases) return
+    if (!exam || !exam.cases) {
+      console.error('updateCurrentDisplay: exam or exam.cases is missing', { exam })
+      return
+    }
+
+    if (caseIndex >= exam.cases.length) {
+      console.error('updateCurrentDisplay: caseIndex out of bounds', { caseIndex, totalCases: exam.cases.length })
+      return
+    }
+
     const caseData = exam.cases[caseIndex]
+    if (!caseData) {
+      console.error('updateCurrentDisplay: caseData is missing', { caseIndex, exam })
+      return
+    }
+
+    console.log('updateCurrentDisplay: Setting case', {
+      caseIndex,
+      imageIndex,
+      caseTitle: caseData.title,
+      totalImages: caseData.images?.length
+    })
+
     setCurrentCase(caseData)
-    setCurrentImage(caseData?.images[imageIndex])
+
+    if (caseData.images && caseData.images[imageIndex]) {
+      setCurrentImage(caseData.images[imageIndex])
+    } else {
+      console.error('updateCurrentDisplay: image not found', {
+        imageIndex,
+        availableImages: caseData.images?.length || 0
+      })
+    }
   }
 
   const handleStart = () => {

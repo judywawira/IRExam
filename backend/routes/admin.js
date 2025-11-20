@@ -214,6 +214,11 @@ router.post('/sessions', async (req, res) => {
       return res.status(400).json({ message: 'At least one examiner is required' });
     }
 
+    // Require at least one assigned student
+    if (!assignedStudents || assignedStudents.length === 0) {
+      return res.status(400).json({ message: 'At least one student must be assigned to the session' });
+    }
+
     // Verify exam exists
     const exam = await Exam.findById(examId);
     if (!exam) {

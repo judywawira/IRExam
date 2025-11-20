@@ -36,6 +36,12 @@ module.exports = (io) => {
           return;
         }
 
+        // Prevent non-admin users from accessing archived sessions
+        if (session.isArchived && socket.userRole !== 'admin') {
+          socket.emit('error', { message: 'This session has been archived and is no longer accessible.' });
+          return;
+        }
+
         socket.join(sessionId);
         socket.sessionId = sessionId;
 
@@ -109,22 +115,23 @@ module.exports = (io) => {
       }
 
       try {
-        const session = await ExamSession.findById(sessionId);
-
-        if (!session) {
-          socket.emit('error', { message: 'Session not found' });
-          return;
-        }
-
-        session.currentCaseIndex = caseIndex;
-        session.currentImageIndex = imageIndex;
-        session.lastUpdated = new Date();
-        await session.save();
-
-        // Broadcast to all participants
+        // Broadcast immediately to all participants for instant synchronization
         io.to(sessionId).emit('image-changed', {
           caseIndex,
           imageIndex
+        });
+
+        // Update database in background without blocking the broadcast
+        ExamSession.findByIdAndUpdate(
+          sessionId,
+          {
+            currentCaseIndex: caseIndex,
+            currentImageIndex: imageIndex,
+            lastUpdated: new Date()
+          },
+          { new: false }
+        ).catch(error => {
+          console.error('Background save error for navigation:', error);
         });
       } catch (error) {
         console.error('Navigate image error:', error);
