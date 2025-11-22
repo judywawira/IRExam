@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
@@ -13,10 +13,17 @@ settings = get_settings()
 
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=6, max_length=72)
     firstName: str
     lastName: str
     role: UserRole = UserRole.STUDENT
+
+    @field_validator('password')
+    @classmethod
+    def validate_password_bytes(cls, v: str) -> str:
+        if len(v.encode('utf-8')) > 72:
+            raise ValueError('Password cannot exceed 72 bytes')
+        return v
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -56,7 +63,14 @@ async def register(req: RegisterRequest):
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    hashed_password = pwd_context.hash(req.password)
+    # Ensure password doesn't exceed bcrypt's 72-byte limit
+    password_bytes = req.password.encode('utf-8')
+    if len(password_bytes) > 72:
+        password_to_hash = password_bytes[:72].decode('utf-8', errors='ignore')
+    else:
+        password_to_hash = req.password
+
+    hashed_password = pwd_context.hash(password_to_hash)
     is_approved = req.role == UserRole.ADMIN
 
     user = User(
@@ -75,7 +89,17 @@ async def register(req: RegisterRequest):
 @router.post("/login", response_model=TokenResponse)
 async def login(req: LoginRequest):
     user = await User.find_one(User.email == req.email)
-    if not user or not pwd_context.verify(req.password, user.password):
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Truncate password if needed for bcrypt verification
+    password_bytes = req.password.encode('utf-8')
+    if len(password_bytes) > 72:
+        password_to_verify = password_bytes[:72].decode('utf-8', errors='ignore')
+    else:
+        password_to_verify = req.password
+
+    if not pwd_context.verify(password_to_verify, user.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_token(str(user.id))
