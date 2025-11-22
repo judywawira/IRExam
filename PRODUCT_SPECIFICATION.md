@@ -9,22 +9,22 @@
 
 ## Executive Summary
 
-IRExam is a real-time, synchronized medical education examination platform designed specifically for delivering image-based clinical cases to radiology residents. The system enables examiners to conduct live, synchronized exams where all students view the same medical images simultaneously, creating a controlled testing environment for radiology and medical imaging education.
+IRExam is a real-time, synchronized medical education examination platform designed specifically for delivering image-based clinical cases to radiology residents. The system enables examiners to conduct live, synchronized exams where the student views the same medical images the examiner is displaying simultaneously, creating a controlled testing environment for radiology and medical imaging education.
 
 ### Key Differentiators
-- **Real-time synchronization** - All students see identical images at the same time
+- **Real-time synchronization** - The student and the examiner see identical images at the same time
 - **DICOM support** - Full medical imaging format with ZIP upload and annotation tools
 - **Multi-user roles** - Admin, Examiner, and Student with distinct capabilities
-- **Annotation tools** - Real-time synchronized drawing tools for teaching
-- **Session management** - Named sessions with multi-examiner and student pairing support
-- **Dual backend** - Both Node.js and FastAPI implementations available
+- **Annotation tools** - Real-time synchronized drawing tools on the images 
+- **Session management** - Named sessions with examiner and student pairing support. 
+- **Specifications** -  FastAPI implementation with Api documentation and React frontend 
 
 ---
 
 ## 1. Product Overview
 
 ### 1.1 Purpose
-IRExam addresses the need for synchronized, controlled examination environments in medical education, particularly for radiology and medical imaging training. It replaces manual image presentation with an automated, synchronized system that ensures all students experience identical examination conditions.
+IRExam addresses the need for synchronized, controlled examination environments in medical education, particularly for radiology and medical imaging training. It replaces manual image presentation with an automated, synchronized system that ensures the student and examiner experience identical examination conditions.
 
 ### 1.2 Target Users
 - **Medical Education Administrators** - Manage cases, exams, users, and sessions
