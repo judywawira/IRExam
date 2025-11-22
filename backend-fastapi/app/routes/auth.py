@@ -1,8 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field
 from passlib.context import CryptContext
 from jose import jwt
 from datetime import datetime, timedelta
+import hashlib
+import base64
 from app.config import get_settings
 from app.models.user import User, UserRole
 from app.middleware.auth import get_current_user
@@ -11,19 +13,25 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 settings = get_settings()
 
+def hash_password(plain_password: str) -> str:
+    """Hash password using SHA-256 pre-hash + bcrypt to handle long passwords."""
+    # Pre-hash with SHA-256 to ensure input is always within bcrypt's 72-byte limit
+    digest = hashlib.sha256(plain_password.encode('utf-8')).digest()
+    password_safe_for_bcrypt = base64.b64encode(digest).decode('utf-8')
+    return pwd_context.hash(password_safe_for_bcrypt)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify password using SHA-256 pre-hash + bcrypt."""
+    digest = hashlib.sha256(plain_password.encode('utf-8')).digest()
+    password_safe_for_bcrypt = base64.b64encode(digest).decode('utf-8')
+    return pwd_context.verify(password_safe_for_bcrypt, hashed_password)
+
 class RegisterRequest(BaseModel):
     email: EmailStr
-    password: str = Field(..., min_length=6, max_length=72)
+    password: str = Field(..., min_length=6)
     firstName: str
     lastName: str
     role: UserRole = UserRole.STUDENT
-
-    @field_validator('password')
-    @classmethod
-    def validate_password_bytes(cls, v: str) -> str:
-        if len(v.encode('utf-8')) > 72:
-            raise ValueError('Password cannot exceed 72 bytes')
-        return v
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -63,14 +71,7 @@ async def register(req: RegisterRequest):
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
 
-    # Ensure password doesn't exceed bcrypt's 72-byte limit
-    password_bytes = req.password.encode('utf-8')
-    if len(password_bytes) > 72:
-        password_to_hash = password_bytes[:72].decode('utf-8', errors='ignore')
-    else:
-        password_to_hash = req.password
-
-    hashed_password = pwd_context.hash(password_to_hash)
+    hashed_password = hash_password(req.password)
     is_approved = req.role == UserRole.ADMIN
 
     user = User(
@@ -92,14 +93,7 @@ async def login(req: LoginRequest):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # Truncate password if needed for bcrypt verification
-    password_bytes = req.password.encode('utf-8')
-    if len(password_bytes) > 72:
-        password_to_verify = password_bytes[:72].decode('utf-8', errors='ignore')
-    else:
-        password_to_verify = req.password
-
-    if not pwd_context.verify(password_to_verify, user.password):
+    if not verify_password(req.password, user.password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     token = create_token(str(user.id))
