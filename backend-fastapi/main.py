@@ -14,6 +14,9 @@ from app.socket.exam_session import sio
 
 settings = get_settings()
 
+# Create uploads directory before mounting
+os.makedirs(settings.upload_dir, exist_ok=True)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Initialize MongoDB connection
@@ -22,7 +25,6 @@ async def lifespan(app: FastAPI):
         database=client[settings.database_name],
         document_models=[User, Case, Exam, ExamSession]
     )
-    os.makedirs(settings.upload_dir, exist_ok=True)
     yield
     # Shutdown
     client.close()

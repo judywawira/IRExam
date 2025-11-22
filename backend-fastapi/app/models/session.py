@@ -11,7 +11,7 @@ class SessionStatus(str, Enum):
     COMPLETED = "completed"
 
 class Participant(BaseModel):
-    odent: PydanticObjectId
+    student: PydanticObjectId
     joinedAt: datetime = Field(default_factory=datetime.utcnow)
     currentImageIndex: int = 0
 
