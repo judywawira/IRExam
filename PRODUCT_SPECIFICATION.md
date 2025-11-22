@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-IRExam is a real-time, synchronized medical education examination platform designed specifically for delivering image-based clinical cases to medical residents. The system enables examiners to conduct live, synchronized exams where all students view the same medical images simultaneously, creating a controlled testing environment for radiology and medical imaging education.
+IRExam is a real-time, synchronized medical education examination platform designed specifically for delivering image-based clinical cases to radiology residents. The system enables examiners to conduct live, synchronized exams where all students view the same medical images simultaneously, creating a controlled testing environment for radiology and medical imaging education.
 
 ### Key Differentiators
 - **Real-time synchronization** - All students see identical images at the same time
